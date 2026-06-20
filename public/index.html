@@ -1,89 +1,137 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Welcome to Firebase Hosting</title>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CHOFAM - 초대가족</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #333; }
 
-    <!-- update the version number as needed -->
-    <script defer src="/__/firebase/12.15.0/firebase-app-compat.js"></script>
-    <!-- include only the Firebase features as you need -->
-    <script defer src="/__/firebase/12.15.0/firebase-auth-compat.js"></script>
-    <script defer src="/__/firebase/12.15.0/firebase-database-compat.js"></script>
-    <script defer src="/__/firebase/12.15.0/firebase-firestore-compat.js"></script>
-    <script defer src="/__/firebase/12.15.0/firebase-functions-compat.js"></script>
-    <script defer src="/__/firebase/12.15.0/firebase-messaging-compat.js"></script>
-    <script defer src="/__/firebase/12.15.0/firebase-storage-compat.js"></script>
-    <script defer src="/__/firebase/12.15.0/firebase-analytics-compat.js"></script>
-    <script defer src="/__/firebase/12.15.0/firebase-remote-config-compat.js"></script>
-    <script defer src="/__/firebase/12.15.0/firebase-performance-compat.js"></script>
-    <!-- 
-      initialize the SDK after all desired features are loaded, set useEmulator to false
-      to avoid connecting the SDK to running emulators.
-    -->
-    <script defer src="/__/firebase/init.js?useEmulator=true"></script>
+    .header {
+      background: linear-gradient(135deg, #4A90D9, #7B68EE);
+      color: #fff;
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .header .logo { font-size: 22px; font-weight: 700; letter-spacing: 1px; }
 
-    <style media="screen">
-      body { background: #ECEFF1; color: rgba(0,0,0,0.87); font-family: Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; }
-      #message { background: white; max-width: 360px; margin: 100px auto 16px; padding: 32px 24px; border-radius: 3px; }
-      #message h2 { color: #ffa100; font-weight: bold; font-size: 16px; margin: 0 0 8px; }
-      #message h1 { font-size: 22px; font-weight: 300; color: rgba(0,0,0,0.6); margin: 0 0 16px;}
-      #message p { line-height: 140%; margin: 16px 0 24px; font-size: 14px; }
-      #message a { display: block; text-align: center; background: #039be5; text-transform: uppercase; text-decoration: none; color: white; padding: 16px; border-radius: 4px; }
-      #message, #message a { box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24); }
-      #load { color: rgba(0,0,0,0.4); text-align: center; font-size: 13px; }
-      @media (max-width: 600px) {
-        body, #message { margin-top: 0; background: white; box-shadow: none; }
-        body { border-top: 16px solid #ffa100; }
-      }
-    </style>
-  </head>
-  <body>
-    <div id="message">
-      <h2>Welcome</h2>
-      <h1>Firebase Hosting Setup Complete</h1>
-      <p>You're seeing this because you've successfully setup Firebase Hosting. Now it's time to go build something extraordinary!</p>
-      <a target="_blank" href="https://firebase.google.com/docs/hosting/">Open Hosting Documentation</a>
+    .hero {
+      background: linear-gradient(135deg, #4A90D9, #7B68EE);
+      color: #fff;
+      text-align: center;
+      padding: 80px 24px 100px;
+    }
+    .hero h1 { font-size: 42px; font-weight: 800; margin-bottom: 16px; }
+    .hero p { font-size: 18px; opacity: 0.9; max-width: 560px; margin: 0 auto 32px; line-height: 1.6; }
+    .hero .cta {
+      display: inline-block;
+      background: #fff;
+      color: #4A90D9;
+      padding: 14px 36px;
+      border-radius: 30px;
+      text-decoration: none;
+      font-weight: 700;
+      font-size: 16px;
+      transition: transform 0.2s;
+    }
+    .hero .cta:hover { transform: scale(1.05); }
+
+    .features {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 32px;
+      max-width: 960px;
+      margin: -50px auto 60px;
+      padding: 0 24px;
+      position: relative;
+      z-index: 1;
+    }
+    .feature-card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 32px 24px;
+      text-align: center;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    }
+    .feature-card .icon { font-size: 40px; margin-bottom: 16px; }
+    .feature-card h3 { font-size: 18px; margin-bottom: 8px; color: #4A90D9; }
+    .feature-card p { font-size: 14px; color: #666; line-height: 1.6; }
+
+    .section {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 60px 24px;
+      text-align: center;
+    }
+    .section h2 { font-size: 28px; font-weight: 700; margin-bottom: 12px; }
+    .section p { font-size: 16px; color: #666; line-height: 1.6; max-width: 600px; margin: 0 auto; }
+
+    .footer {
+      background: #f8f9fa;
+      padding: 32px 24px;
+      text-align: center;
+      border-top: 1px solid #eee;
+    }
+    .footer-links { margin-bottom: 12px; }
+    .footer-links a {
+      color: #666;
+      text-decoration: none;
+      margin: 0 12px;
+      font-size: 14px;
+    }
+    .footer-links a:hover { color: #4A90D9; }
+    .footer .copy { font-size: 12px; color: #999; }
+
+    @media (max-width: 600px) {
+      .hero h1 { font-size: 28px; }
+      .hero p { font-size: 15px; }
+      .features { grid-template-columns: 1fr; margin-top: -30px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="logo">CHOFAM</div>
+  </header>
+
+  <section class="hero">
+    <h1>우리 가족, 하나로 연결</h1>
+    <p>CHOFAM은 가족 구성원 간의 소통과 추억 공유를 더 쉽고 따뜻하게 만들어주는 서비스입니다.</p>
+    <a href="#features" class="cta">시작하기</a>
+  </section>
+
+  <div class="features" id="features">
+    <div class="feature-card">
+      <div class="icon">&#x1F4AC;</div>
+      <h3>가족 소통</h3>
+      <p>가족만의 프라이빗 공간에서 일상을 나누고 대화하세요.</p>
     </div>
-    <p id="load">Firebase SDK Loading&hellip;</p>
+    <div class="feature-card">
+      <div class="icon">&#x1F4F8;</div>
+      <h3>추억 공유</h3>
+      <p>소중한 사진과 영상을 가족 앨범에 함께 모아보세요.</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">&#x1F4C5;</div>
+      <h3>일정 관리</h3>
+      <p>가족 일정을 한눈에 확인하고 함께 계획을 세워보세요.</p>
+    </div>
+  </div>
 
-    <script>
-      document.addEventListener('DOMContentLoaded', function() {
-        const loadEl = document.querySelector('#load');
-        // // 🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥
-        // // The Firebase SDK is initialized and available here!
-        //
-        // firebase.auth().onAuthStateChanged(user => { });
-        // firebase.database().ref('/path/to/ref').on('value', snapshot => { });
-        // firebase.firestore().doc('/foo/bar').get().then(() => { });
-        // firebase.functions().httpsCallable('yourFunction')().then(() => { });
-        // firebase.messaging().requestPermission().then(() => { });
-        // firebase.storage().ref('/path/to/ref').getDownloadURL().then(() => { });
-        // firebase.analytics(); // call to activate
-        // firebase.analytics().logEvent('tutorial_completed');
-        // firebase.performance(); // call to activate
-        //
-        // // 🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥
+  <section class="section">
+    <h2>가족의 소중함을 지킵니다</h2>
+    <p>CHOFAM은 개인정보 보호를 최우선으로 생각하며, 안전하고 신뢰할 수 있는 가족 커뮤니케이션 환경을 제공합니다.</p>
+  </section>
 
-        try {
-          let app = firebase.app();
-          let features = [
-            'auth', 
-            'database', 
-            'firestore',
-            'functions',
-            'messaging', 
-            'storage', 
-            'analytics', 
-            'remoteConfig',
-            'performance',
-          ].filter(feature => typeof app[feature] === 'function');
-          loadEl.textContent = `Firebase SDK loaded with ${features.join(', ')}`;
-        } catch (e) {
-          console.error(e);
-          loadEl.textContent = 'Error loading the Firebase SDK, check the console.';
-        }
-      });
-    </script>
-  </body>
+  <footer class="footer">
+    <div class="footer-links">
+      <a href="/privacy.html">개인정보처리방침</a>
+      <a href="/terms.html">이용약관</a>
+    </div>
+    <p class="copy">&copy; 2025 CHOFAM. All rights reserved.</p>
+  </footer>
+</body>
 </html>
