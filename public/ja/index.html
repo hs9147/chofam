@@ -1,16 +1,16 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="ja">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>CHOFAM - 가족기업 플랫폼</title>
-  <meta name="description" content="CHOFAM은 가족 연합형 분산 기업 플랫폼입니다. 동일 생활급과 성과·지분 기반 보상 구조로 가족 자산을 함께 축적합니다.">
+  <title>CHOFAM - ファミリー企業プラットフォーム</title>
+  <meta name="description" content="CHOFAMは分散型ファミリー企業プラットフォームです。同一生活給と貢献ベースの報酬で家族の資産を共に築きます。">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Noto Sans KR', sans-serif; color: #1a1a2e; background: #fff; word-break: keep-all; overflow-wrap: break-word; }
+    body { font-family: 'Noto Sans JP', sans-serif; color: #1a1a2e; background: #fff; word-break: keep-all; overflow-wrap: break-word; }
 
     nav {
       position: fixed; top: 0; left: 0; right: 0; z-index: 100;
@@ -21,9 +21,7 @@
       border-bottom: 1px solid rgba(0,0,0,0.06);
     }
     nav .logo { font-size: 20px; font-weight: 900; color: #1a1a2e; letter-spacing: 2px; }
-    nav .nav-links a {
-      color: #555; text-decoration: none; font-size: 14px; font-weight: 700; margin-left: 24px;
-    }
+    nav .nav-links a { color: #555; text-decoration: none; font-size: 14px; font-weight: 700; margin-left: 24px; }
     nav .nav-links a:hover { color: #1a1a2e; }
 
     .hero {
@@ -37,7 +35,7 @@
       background: #1a1a2e; color: #fff; font-size: 12px; font-weight: 700;
       letter-spacing: 1px; margin-bottom: 24px;
     }
-    .hero h1 { font-size: 48px; font-weight: 900; line-height: 1.2; margin-bottom: 20px; color: #1a1a2e; }
+    .hero h1 { font-size: 44px; font-weight: 900; line-height: 1.3; margin-bottom: 20px; color: #1a1a2e; }
     .hero h1 span { color: #4a6cf7; }
     .hero p { font-size: 17px; color: #666; line-height: 1.8; margin-bottom: 36px; }
     .hero .cta {
@@ -48,20 +46,12 @@
     .hero .cta:hover { background: #4a6cf7; }
 
     .section { max-width: 960px; margin: 0 auto; padding: 80px 24px; }
-    .section-label {
-      font-size: 12px; font-weight: 700; letter-spacing: 2px;
-      color: #4a6cf7; margin-bottom: 12px;
-    }
+    .section-label { font-size: 12px; font-weight: 700; letter-spacing: 2px; color: #4a6cf7; margin-bottom: 12px; }
     .section h2 { font-size: 32px; font-weight: 900; margin-bottom: 16px; }
     .section .desc { font-size: 16px; color: #666; line-height: 1.7; max-width: 560px; margin-bottom: 48px; }
 
-    .principles {
-      display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 24px;
-    }
-    .principle {
-      padding: 28px 24px; border-radius: 12px; background: #f8f9ff;
-      border: 1px solid #eef1ff;
-    }
+    .principles { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 24px; }
+    .principle { padding: 28px 24px; border-radius: 12px; background: #f8f9ff; border: 1px solid #eef1ff; }
     .principle .num { font-size: 28px; font-weight: 900; color: #4a6cf7; margin-bottom: 8px; }
     .principle h3 { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
     .principle p { font-size: 14px; color: #666; line-height: 1.6; }
@@ -69,13 +59,8 @@
     .structure-section { background: #1a1a2e; color: #fff; }
     .structure-section .section-label { color: #7b8aff; }
     .structure-section .desc { color: rgba(255,255,255,0.6); }
-    .structure-grid {
-      display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px;
-    }
-    .structure-card {
-      padding: 32px 24px; border-radius: 12px;
-      background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08);
-    }
+    .structure-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px; }
+    .structure-card { padding: 32px 24px; border-radius: 12px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); }
     .structure-card h3 { font-size: 18px; font-weight: 700; margin-bottom: 12px; color: #7b8aff; }
     .structure-card p { font-size: 14px; line-height: 1.7; color: rgba(255,255,255,0.6); }
     .structure-card code {
@@ -87,23 +72,17 @@
     .contact-section { text-align: center; background: #f8f9ff; }
     .contact-section h2 { margin-bottom: 12px; }
     .contact-section .desc { margin: 0 auto 32px; }
-    .contact-email {
-      font-size: 18px; font-weight: 700; color: #4a6cf7; text-decoration: none;
-    }
+    .contact-email { font-size: 18px; font-weight: 700; color: #4a6cf7; text-decoration: none; }
 
-    footer {
-      border-top: 1px solid #eee; padding: 32px 24px; text-align: center;
-    }
+    footer { border-top: 1px solid #eee; padding: 32px 24px; text-align: center; }
     footer .footer-links { margin-bottom: 12px; }
-    footer .footer-links a {
-      color: #666; text-decoration: none; font-size: 14px; margin: 0 16px;
-    }
+    footer .footer-links a { color: #666; text-decoration: none; font-size: 14px; margin: 0 16px; }
     footer .footer-links a:hover { color: #1a1a2e; }
     footer .copy { font-size: 12px; color: #999; }
 
     @media (max-width: 640px) {
       nav { padding: 12px 16px; }
-      .hero h1 { font-size: 32px; }
+      .hero h1 { font-size: 28px; }
       .section { padding: 60px 20px; }
       .section h2 { font-size: 24px; }
     }
@@ -113,10 +92,10 @@
   <nav>
     <div class="logo">CHOFAM</div>
     <div class="nav-links">
-      <a href="https://chofam-home.web.app/privacy.html">개인정보처리방침</a>
-      <a href="https://chofam-home.web.app/terms.html">이용약관</a>
+      <a href="https://chofam-home.web.app/ja/privacy.html">プライバシーポリシー</a>
+      <a href="https://chofam-home.web.app/ja/terms.html">利用規約</a>
+      <a href="https://chofam-home.web.app/">KO</a>
       <a href="https://chofam-home.web.app/en/">EN</a>
-      <a href="https://chofam-home.web.app/ja/">JA</a>
       <a href="https://chofam-home.web.app/zh/">ZH</a>
     </div>
   </nav>
@@ -124,79 +103,79 @@
   <section class="hero">
     <div class="hero-inner">
       <div class="badge">FAMILY ENTERPRISE PLATFORM</div>
-      <h1>나의 자녀가<br>일하고 싶은 <span>기업</span></h1>
-      <p>가족 연합형 분산 기업 플랫폼. 동일 생활급과 성과·지분 기반 보상 구조로 가족 자산을 함께 축적합니다. 각 구성원은 1인 기업으로서 독립적으로 운영하며, 공정한 기여 기반 분배를 실현합니다.</p>
-      <a href="#principles" class="cta">자세히 알아보기</a>
+      <h1>子どもたちが<br>働きたいと思う<span>企業</span></h1>
+      <p>分散型ファミリー企業プラットフォーム。各メンバーは独立した事業者として運営し、同一の生活給と公正な貢献ベースの報酬で家族の資産を共に築きます。</p>
+      <a href="#principles" class="cta">詳しく見る</a>
     </div>
   </section>
 
   <section class="section" id="principles">
     <div class="section-label">PHILOSOPHY</div>
-    <h2>기본 철학</h2>
-    <p class="desc">월급은 재산 축적이 아닌 생활 수단. 모두 같은 금액으로 지급하고, 성과와 기여로 자산을 축적합니다.</p>
+    <h2>基本理念</h2>
+    <p class="desc">給与は資産形成の手段ではなく、生活の安定のためのもの。全員が同額を受け取り、成果と貢献で資産を築きます。</p>
     <div class="principles">
       <div class="principle">
         <div class="num">01</div>
-        <h3>동일 생활급</h3>
-        <p>역할과 무관하게 동일한 생활 안정 급여를 지급합니다. 월급은 경쟁이 아닌 안정의 도구입니다.</p>
+        <h3>同一生活給</h3>
+        <p>役割に関わらず、全メンバーに同額の生活安定給を支給します。給与は競争ではなく安定のための手段です。</p>
       </div>
       <div class="principle">
         <div class="num">02</div>
-        <h3>1인 기업</h3>
-        <p>각 구성원은 독립된 사업자로서 자신의 매출과 비용을 관리합니다.</p>
+        <h3>個人事業体</h3>
+        <p>各メンバーは独立した事業者として、自身の売上と費用を管理します。</p>
       </div>
       <div class="principle">
         <div class="num">03</div>
-        <h3>기여 기반 분배</h3>
-        <p>매출에서 직접 비용을 차감한 비율로 간접 비용을 분배하고, 성과금을 지급합니다.</p>
+        <h3>貢献ベースの配分</h3>
+        <p>各メンバーの純貢献に応じて共通費用を公平に配分し、成果に基づく報酬を支給します。</p>
       </div>
       <div class="principle">
         <div class="num">04</div>
-        <h3>지분 축적</h3>
-        <p>개인별 초과 기여분은 가족 지주회사 주식으로 전환하여 장기 자산을 축적합니다.</p>
+        <h3>持分の蓄積</h3>
+        <p>超過貢献分はファミリーホールディングスの株式に転換し、長期的な家族資産を築きます。</p>
       </div>
     </div>
   </section>
 
   <section class="section structure-section">
     <div class="section-label">STRUCTURE</div>
-    <h2>운영 구조</h2>
-    <p class="desc">투명한 정산과 공정한 분배 시스템으로 가족기업을 운영합니다.</p>
+    <h2>運営構造</h2>
+    <p class="desc">透明な精算と公正な配分システムでファミリー企業を運営します。</p>
     <div class="structure-grid">
       <div class="structure-card">
-        <h3>개인 손익 계산</h3>
-        <p>각 구성원의 기여액을 투명하게 산정합니다.</p>
-        <code>개인 순기여액
-= 개인 매출
-- 직접 비용
-- 간접 비용 배분</code>
+        <h3>個人損益計算</h3>
+        <p>各メンバーの貢献額を透明に算定します。</p>
+        <code>純貢献額
+= 個人売上
+- 直接費用
+- 間接費用配分</code>
       </div>
       <div class="structure-card">
-        <h3>간접비 분배</h3>
-        <p>사무실, 마케팅, 법무 등 공통 비용을 순기여 비율로 배분합니다.</p>
-        <code>각 구성원의 순기여 비율에 따라
-공통 비용을 공정하게 배분</code>
+        <h3>間接費配分</h3>
+        <p>オフィス、マーケティング、法務などの共通費用を各メンバーの純貢献比率に応じて配分します。</p>
+        <code>各メンバーの純貢献比率に応じて
+共通費用を公正に配分</code>
       </div>
       <div class="structure-card">
-        <h3>성과금 + 지분</h3>
-        <p>일정 기준 초과 기여분에 대해 성과금을 지급하고, 나머지는 주식으로 전환합니다.</p>
-        <code>초과 기여의 일부 → 성과금 지급
-초과 기여의 나머지 → 주식 전환</code>
+        <h3>成果報酬と持分</h3>
+        <p>基準を超えた貢献分について、一部を成果報酬として支給し、残りを株式に転換します。</p>
+        <code>超過貢献の一部 → 成果報酬
+超過貢献の残り → 株式転換</code>
       </div>
     </div>
   </section>
 
   <section class="section contact-section">
     <div class="section-label">CONTACT</div>
-    <h2>문의하기</h2>
-    <p class="desc">CHOFAM에 대해 궁금한 점이 있으시면 언제든 연락해 주세요.</p>
+    <h2>お問い合わせ</h2>
+    <p class="desc">CHOFAMについてご質問がございましたら、お気軽にご連絡ください。</p>
     <a href="mailto:hichofam@gmail.com" class="contact-email">hichofam@gmail.com</a>
   </section>
 
   <footer>
     <div class="footer-links">
-      <a href="https://chofam-home.web.app/privacy.html">개인정보처리방침</a>
-      <a href="https://chofam-home.web.app/terms.html">이용약관</a>
+      <a href="https://chofam-home.web.app/ja/privacy.html">プライバシーポリシー</a>
+      <a href="https://chofam-home.web.app/ja/terms.html">利用規約</a>
     </div>
     <p class="copy">&copy; 2026 CHOFAM. All rights reserved.</p>
   </footer>
