@@ -4,91 +4,100 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>개인정보처리방침 - CHOFAM</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #333; background: #f8f9fa; }
+    body { font-family: 'Noto Sans KR', sans-serif; color: #1a1a2e; background: #f8f9ff; }
 
-    .header {
-      background: linear-gradient(135deg, #4A90D9, #7B68EE);
-      color: #fff;
-      padding: 16px 24px;
-      display: flex;
-      align-items: center;
+    nav {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 32px; background: #fff; border-bottom: 1px solid rgba(0,0,0,0.06);
     }
-    .header a { color: #fff; text-decoration: none; font-size: 22px; font-weight: 700; letter-spacing: 1px; }
+    nav .logo { font-size: 20px; font-weight: 900; color: #1a1a2e; text-decoration: none; letter-spacing: 2px; }
+    nav .nav-links a { color: #555; text-decoration: none; font-size: 14px; font-weight: 700; margin-left: 24px; }
+    nav .nav-links a:hover { color: #1a1a2e; }
 
-    .content {
-      max-width: 800px;
-      margin: 40px auto;
-      background: #fff;
-      border-radius: 12px;
-      padding: 48px 40px;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    main {
+      max-width: 760px; margin: 40px auto; padding: 48px 40px;
+      background: #fff; border-radius: 12px; box-shadow: 0 1px 8px rgba(0,0,0,0.04);
     }
-    .content h1 { font-size: 28px; font-weight: 700; margin-bottom: 8px; color: #4A90D9; }
-    .content .date { font-size: 13px; color: #999; margin-bottom: 32px; }
-    .content h2 { font-size: 18px; font-weight: 700; margin: 28px 0 12px; color: #333; }
-    .content p, .content li { font-size: 15px; line-height: 1.8; color: #555; }
-    .content ul { padding-left: 20px; margin-bottom: 12px; }
-    .content li { margin-bottom: 4px; }
+    main h1 { font-size: 28px; font-weight: 900; margin-bottom: 4px; }
+    .effective { font-size: 13px; color: #999; margin-bottom: 32px; }
+    .intro { font-size: 15px; color: #555; line-height: 1.8; margin-bottom: 32px; }
+    h2 { font-size: 17px; font-weight: 700; margin: 32px 0 12px; color: #1a1a2e; }
+    p { font-size: 15px; line-height: 1.8; color: #555; margin-bottom: 8px; }
+    ul { padding-left: 20px; margin-bottom: 12px; }
+    li { font-size: 15px; line-height: 1.8; color: #555; margin-bottom: 4px; }
+    strong { color: #1a1a2e; }
+    table { width: 100%; border-collapse: collapse; margin: 12px 0 16px; }
+    th, td { padding: 10px 12px; text-align: left; font-size: 14px; border-bottom: 1px solid #eee; }
+    th { background: #f8f9ff; font-weight: 700; color: #1a1a2e; }
+    td { color: #555; }
 
-    .footer {
-      text-align: center;
-      padding: 32px 24px;
-      font-size: 12px;
-      color: #999;
+    footer {
+      text-align: center; padding: 32px 24px; font-size: 12px; color: #999;
     }
-    .footer a { color: #666; text-decoration: none; margin: 0 12px; font-size: 14px; }
-    .footer a:hover { color: #4A90D9; }
+    footer a { color: #666; text-decoration: none; margin: 0 16px; font-size: 14px; }
+    footer a:hover { color: #1a1a2e; }
 
-    @media (max-width: 600px) {
-      .content { margin: 16px; padding: 28px 20px; }
-      .content h1 { font-size: 22px; }
+    @media (max-width: 640px) {
+      main { margin: 16px; padding: 28px 20px; }
+      main h1 { font-size: 22px; }
     }
   </style>
 </head>
 <body>
-  <header class="header">
-    <a href="/">CHOFAM</a>
-  </header>
+  <nav>
+    <a href="https://chofam-home.web.app/" class="logo">CHOFAM</a>
+    <div class="nav-links">
+      <a href="https://chofam-home.web.app/">홈</a>
+      <a href="https://chofam-home.web.app/terms.html">이용약관</a>
+    </div>
+  </nav>
 
-  <main class="content">
+  <main>
     <h1>개인정보처리방침</h1>
-    <p class="date">시행일: 2025년 1월 1일</p>
+    <p class="effective">시행일: 2025년 1월 1일</p>
 
-    <p>CHOFAM(이하 "회사")은 이용자의 개인정보를 중요시하며, 「개인정보 보호법」 등 관련 법령을 준수합니다. 본 개인정보처리방침은 회사가 제공하는 서비스(이하 "서비스")에 적용됩니다.</p>
+    <p class="intro">CHOFAM(이하 "회사")은 「개인정보 보호법」 등 관련 법령을 준수하며, 이용자의 개인정보를 보호하기 위해 최선을 다합니다. 본 방침은 회사가 제공하는 가족기업 플랫폼 서비스(이하 "서비스")에 적용됩니다.</p>
 
     <h2>1. 수집하는 개인정보 항목</h2>
-    <p>회사는 서비스 제공을 위해 다음의 개인정보를 수집합니다.</p>
+    <table>
+      <tr><th>구분</th><th>항목</th></tr>
+      <tr><td>필수</td><td>전화번호, 이메일 주소, 비밀번호, 닉네임</td></tr>
+      <tr><td>선택</td><td>프로필 사진, 생년월일</td></tr>
+      <tr><td>자동 수집</td><td>기기 정보(OS, 기기 모델), 접속 로그, 서비스 이용 기록, IP 주소</td></tr>
+    </table>
+
+    <h2>2. 수집 및 이용 목적</h2>
     <ul>
-      <li><strong>필수항목:</strong> 이메일 주소, 비밀번호, 닉네임(표시 이름)</li>
-      <li><strong>선택항목:</strong> 프로필 사진, 생년월일</li>
-      <li><strong>자동 수집 항목:</strong> 기기 정보, 접속 로그, 서비스 이용 기록</li>
+      <li><strong>회원 관리:</strong> 본인 확인(전화번호 인증), 회원 식별, 부정 이용 방지</li>
+      <li><strong>서비스 제공:</strong> 가족 그룹 구성, 기여 정산, 성과/지분 관리 기능 제공</li>
+      <li><strong>서비스 개선:</strong> 이용 통계 분석, 서비스 품질 향상</li>
+      <li><strong>고객 지원:</strong> 문의 처리, 공지사항 전달</li>
     </ul>
 
-    <h2>2. 개인정보의 수집 및 이용 목적</h2>
-    <ul>
-      <li>회원 가입 및 관리: 본인 확인, 회원 식별, 서비스 부정 이용 방지</li>
-      <li>서비스 제공: 가족 그룹 구성, 콘텐츠 공유, 일정 관리 기능 제공</li>
-      <li>서비스 개선: 이용 통계 분석, 서비스 품질 향상</li>
-      <li>고객 지원: 문의 사항 처리, 공지사항 전달</li>
-    </ul>
+    <h2>3. 보유 및 이용 기간</h2>
+    <p>회사는 수집 및 이용 목적이 달성된 후 해당 정보를 지체 없이 파기합니다. 단, 관련 법령에 의해 보존이 필요한 경우 아래 기간 동안 보관합니다.</p>
+    <table>
+      <tr><th>보존 근거</th><th>기간</th></tr>
+      <tr><td>계약 또는 청약철회에 관한 기록 (전자상거래법)</td><td>5년</td></tr>
+      <tr><td>대금 결제 및 재화 공급에 관한 기록 (전자상거래법)</td><td>5년</td></tr>
+      <tr><td>소비자 불만 또는 분쟁 처리에 관한 기록 (전자상거래법)</td><td>3년</td></tr>
+      <tr><td>접속에 관한 기록 (통신비밀보호법)</td><td>3개월</td></tr>
+    </table>
 
-    <h2>3. 개인정보의 보유 및 이용 기간</h2>
-    <p>회사는 개인정보 수집 및 이용 목적이 달성된 후에는 해당 정보를 지체 없이 파기합니다. 단, 관련 법령에 의해 보존이 필요한 경우 일정 기간 보관합니다.</p>
-    <ul>
-      <li>계약 또는 청약철회에 관한 기록: 5년 (전자상거래법)</li>
-      <li>접속에 관한 기록: 3개월 (통신비밀보호법)</li>
-    </ul>
-
-    <h2>4. 개인정보의 제3자 제공</h2>
+    <h2>4. 제3자 제공</h2>
     <p>회사는 이용자의 동의 없이 개인정보를 제3자에게 제공하지 않습니다. 다만, 법령에 의해 요구되는 경우는 예외로 합니다.</p>
 
-    <h2>5. 개인정보의 처리 위탁</h2>
-    <p>회사는 서비스 운영을 위해 다음과 같이 개인정보 처리를 위탁합니다.</p>
-    <ul>
-      <li><strong>Google Firebase:</strong> 데이터 저장 및 인증 서비스</li>
-    </ul>
+    <h2>5. 처리 위탁</h2>
+    <p>회사는 서비스 운영을 위해 아래와 같이 개인정보 처리를 위탁합니다.</p>
+    <table>
+      <tr><th>수탁업체</th><th>위탁 업무</th></tr>
+      <tr><td>Google (Firebase)</td><td>인증(전화번호/이메일), 데이터 저장, 호스팅</td></tr>
+    </table>
 
     <h2>6. 이용자의 권리</h2>
     <p>이용자는 언제든지 다음의 권리를 행사할 수 있습니다.</p>
@@ -97,30 +106,30 @@
       <li>개인정보 처리 정지 요청</li>
       <li>회원 탈퇴 요청</li>
     </ul>
+    <p>요청은 서비스 내 설정 또는 이메일(hichofam@gmail.com)을 통해 접수하실 수 있습니다.</p>
 
-    <h2>7. 개인정보 보호를 위한 안전 조치</h2>
-    <p>회사는 개인정보의 안전성 확보를 위해 다음과 같은 조치를 취합니다.</p>
+    <h2>7. 안전성 확보 조치</h2>
     <ul>
-      <li>개인정보의 암호화 전송 (SSL/TLS)</li>
+      <li>개인정보의 암호화 전송 및 저장 (SSL/TLS, Firebase Security Rules)</li>
       <li>접근 권한 관리 및 접근 통제</li>
-      <li>개인정보 처리 시스템에 대한 접속 기록 보관</li>
+      <li>개인정보 처리 시스템 접속 기록 보관</li>
+      <li>Firebase App Check를 통한 앱 진위 검증</li>
     </ul>
 
     <h2>8. 개인정보 보호책임자</h2>
-    <p>개인정보 처리에 관한 문의는 아래로 연락해 주시기 바랍니다.</p>
     <ul>
       <li><strong>담당:</strong> CHOFAM 개인정보보호 담당</li>
-      <li><strong>이메일:</strong> privacy@chofam.com</li>
+      <li><strong>이메일:</strong> hichofam@gmail.com</li>
     </ul>
 
     <h2>9. 방침 변경</h2>
-    <p>본 개인정보처리방침은 관련 법령 및 회사 정책에 따라 변경될 수 있으며, 변경 시 서비스 내 공지를 통해 안내드립니다.</p>
+    <p>본 방침은 관련 법령 및 회사 정책에 따라 변경될 수 있으며, 변경 시 서비스 내 공지를 통해 안내합니다.</p>
   </main>
 
-  <footer class="footer">
+  <footer>
     <div>
-      <a href="/">홈</a>
-      <a href="/terms.html">이용약관</a>
+      <a href="https://chofam-home.web.app/">홈</a>
+      <a href="https://chofam-home.web.app/terms.html">이용약관</a>
     </div>
     <p style="margin-top: 12px;">&copy; 2025 CHOFAM. All rights reserved.</p>
   </footer>
