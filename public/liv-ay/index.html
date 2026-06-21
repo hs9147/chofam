@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Liv-ay - CHOFAM</title>
+  <meta name="description" content="Liv-ay는 CHOFAM이 제공하는 가족기업 플랫폼 앱입니다.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Noto Sans KR', sans-serif; color: #1a1a2e; background: #fff; word-break: keep-all; overflow-wrap: break-word; }
+
+    nav {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 32px; background: #fff; border-bottom: 1px solid rgba(0,0,0,0.06);
+    }
+    nav .logo { font-size: 20px; font-weight: 900; color: #1a1a2e; text-decoration: none; letter-spacing: 2px; }
+    nav .nav-links a { color: #555; text-decoration: none; font-size: 14px; font-weight: 700; margin-left: 24px; }
+    nav .nav-links a:hover { color: #1a1a2e; }
+
+    .hero {
+      min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      text-align: center; padding: 100px 24px 80px;
+      background: linear-gradient(160deg, #f0f4ff 0%, #e8ecff 50%, #f5f0ff 100%);
+    }
+    .hero-inner { max-width: 560px; }
+    .hero .app-name {
+      font-size: 56px; font-weight: 900; color: #4a6cf7;
+      letter-spacing: -1px; margin-bottom: 8px;
+    }
+    .hero .tagline {
+      font-size: 16px; color: #999; font-weight: 700; letter-spacing: 2px;
+      margin-bottom: 32px;
+    }
+    .hero p { font-size: 17px; color: #666; line-height: 1.8; margin-bottom: 40px; }
+
+    .features {
+      max-width: 800px; margin: 0 auto; padding: 80px 24px;
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 24px;
+    }
+    .feature {
+      padding: 28px 24px; border-radius: 12px; background: #f8f9ff;
+      border: 1px solid #eef1ff;
+    }
+    .feature h3 { font-size: 16px; font-weight: 700; margin-bottom: 8px; color: #4a6cf7; }
+    .feature p { font-size: 14px; color: #666; line-height: 1.6; }
+
+    .info-section {
+      max-width: 800px; margin: 0 auto; padding: 0 24px 80px;
+    }
+    .info-section h2 { font-size: 24px; font-weight: 900; margin-bottom: 16px; }
+    .info-section p { font-size: 15px; color: #666; line-height: 1.8; margin-bottom: 12px; }
+    .info-section a { color: #4a6cf7; text-decoration: none; font-weight: 700; }
+    .info-section a:hover { text-decoration: underline; }
+
+    footer {
+      border-top: 1px solid #eee; padding: 32px 24px; text-align: center;
+    }
+    footer .footer-links { margin-bottom: 12px; }
+    footer .footer-links a { color: #666; text-decoration: none; font-size: 14px; margin: 0 16px; }
+    footer .footer-links a:hover { color: #1a1a2e; }
+    footer .copy { font-size: 12px; color: #999; }
+
+    @media (max-width: 640px) {
+      nav { padding: 12px 16px; }
+      .hero .app-name { font-size: 40px; }
+      .features { padding: 60px 20px; }
+    }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="https://chofam-home.web.app/liv-ay/" class="logo">Liv-ay</a>
+    <div class="nav-links">
+      <a href="https://chofam-home.web.app/">CHOFAM</a>
+      <a href="https://chofam-home.web.app/privacy.html">개인정보처리방침</a>
+      <a href="https://chofam-home.web.app/terms.html">이용약관</a>
+    </div>
+  </nav>
+
+  <section class="hero">
+    <div class="hero-inner">
+      <div class="app-name">Liv-ay</div>
+      <div class="tagline">by CHOFAM</div>
+      <p>가족기업을 위한 스마트 플랫폼. 구성원 간 투명한 기여 정산, 성과 관리, 소통을 하나의 앱에서 관리합니다.</p>
+    </div>
+  </section>
+
+  <div class="features">
+    <div class="feature">
+      <h3>기여 정산</h3>
+      <p>각 구성원의 매출과 비용을 기록하고, 공정한 기여 기반으로 간접비를 배분합니다.</p>
+    </div>
+    <div class="feature">
+      <h3>성과 관리</h3>
+      <p>기준을 초과한 기여에 대해 성과금을 산정하고 지분을 관리합니다.</p>
+    </div>
+    <div class="feature">
+      <h3>가족 소통</h3>
+      <p>가족 그룹 내에서 안전하게 소통하고, 일정과 정보를 공유합니다.</p>
+    </div>
+  </div>
+
+  <div class="info-section">
+    <h2>운영사</h2>
+    <p>Liv-ay는 <a href="https://chofam-home.web.app/">CHOFAM</a>이 운영하는 가족기업 플랫폼 서비스입니다.</p>
+    <p>문의: <a href="mailto:hichofam@gmail.com">hichofam@gmail.com</a></p>
+  </div>
+
+  <footer>
+    <div class="footer-links">
+      <a href="https://chofam-home.web.app/privacy.html">개인정보처리방침</a>
+      <a href="https://chofam-home.web.app/terms.html">이용약관</a>
+      <a href="https://chofam-home.web.app/">CHOFAM</a>
+    </div>
+    <p class="copy">&copy; 2026 CHOFAM. All rights reserved.</p>
+  </footer>
+</body>
+</html>
