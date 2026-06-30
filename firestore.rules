@@ -1,0 +1,11 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // mail_logs is written only by Cloud Functions via the Admin SDK,
+    // which bypasses these rules. Deny all direct client access.
+    match /mail_logs/{logId} {
+      allow read, write: if false;
+    }
+  }
+}
