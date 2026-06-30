@@ -16,7 +16,7 @@
 ## 설정
 
 1. SendGrid에서 발신 도메인 인증(SPF/DKIM) 및 동적 템플릿 생성
-2. 서비스별 API 키 발급 (예: liv-ay 게임서버용, 매니저 웹페이지 admin용)
+2. 서비스별 API 키 발급 (예: liv-ay 게임서버용, 매니저 웹페이지 admin용) — 자세한 절차는 [API_KEYS.md](./API_KEYS.md) 참고
 3. 시크릿 등록:
    ```bash
    firebase functions:secrets:set SENDGRID_API_KEY
