@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>메일 로그 - cho-fam Admin</title>
+  <title>메일 로그 - CHO-FAM Admin</title>
   <meta name="robots" content="noindex, nofollow">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -43,7 +43,7 @@
 </head>
 <body>
   <header>
-    <h1>cho-fam 메일 로그</h1>
+    <h1>CHO-FAM 메일 로그</h1>
     <span style="font-size:12px;color:rgba(255,255,255,0.4)">/api/mail</span>
   </header>
 
@@ -53,7 +53,7 @@
       <select id="sourceFilter">
         <option value="">모든 서비스</option>
         <option value="liv-ay">liv-ay</option>
-        <option value="cho-fam-admin">cho-fam-admin</option>
+        <option value="CHO-FAM-admin">CHO-FAM-admin</option>
       </select>
       <select id="statusFilter">
         <option value="">모든 상태</option>
@@ -76,7 +76,7 @@
     const sourceEl = document.getElementById('sourceFilter');
     const statusEl = document.getElementById('statusFilter');
 
-    apiKeyEl.value = sessionStorage.getItem('cho-fam_admin_key') || '';
+    apiKeyEl.value = sessionStorage.getItem('CHO-FAM_admin_key') || '';
 
     function fmtDate(value) {
       if (!value) return '-';
@@ -87,7 +87,7 @@
     async function loadLogs() {
       const key = apiKeyEl.value.trim();
       if (!key) { resultEl.innerHTML = '<div class="error">API Key를 입력하세요.</div>'; return; }
-      sessionStorage.setItem('cho-fam_admin_key', key);
+      sessionStorage.setItem('CHO-FAM_admin_key', key);
 
       const params = new URLSearchParams();
       if (sourceEl.value) params.set('source', sourceEl.value);
