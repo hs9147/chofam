@@ -1,6 +1,6 @@
 # 메일 API 키 발급 가이드
 
-`chofam-home` Functions(`/api/mail/*`)를 호출하는 각 서비스(게임서버, 매니저 웹페이지 등)는
+`chofam` Functions(`/api/mail/*`)를 호출하는 각 서비스(게임서버, 매니저 웹페이지 등)는
 고유한 API 키를 발급받아 `x-api-key` 헤더로 인증합니다. 키 자체는 Firebase Secret
 (`MAIL_API_KEYS`)에 JSON 맵 형태로 저장되며, 코드나 git에는 절대 커밋하지 않습니다.
 
@@ -70,7 +70,7 @@ firebase emulators:start --only functions
 발송 시 헤더로 전달합니다.
 
 ```bash
-curl -X POST https://chofam-home.web.app/api/mail/send \
+curl -X POST https://chofam.web.app/api/mail/send \
   -H "x-api-key: sk_liv_ay_7f3a1c9e4b2d8f6a0c5e9b3d7f1a2c4e" \
   -H "Content-Type: application/json" \
   -d '{"to":"user@example.com","templateId":"d-xxxxxxxx","dynamicData":{"code":"123456"}}'

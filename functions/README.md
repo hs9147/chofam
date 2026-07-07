@@ -5,7 +5,7 @@
 
 ## 엔드포인트
 
-베이스 URL: `https://chofam-home.web.app/api/mail` (Hosting rewrite를 통해 Functions로 연결)
+베이스 URL: `https://chofam.web.app/api/mail` (Hosting rewrite를 통해 Functions로 연결)
 
 | Method | Path | 인증 | 설명 |
 | --- | --- | --- | --- |

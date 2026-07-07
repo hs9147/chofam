@@ -1,7 +1,7 @@
 const sgMail = require('@sendgrid/mail');
 const { mailLogs } = require('./firestore');
 
-const FROM_ADDRESS = process.env.MAIL_FROM_ADDRESS || 'noreply@chofam-home.web.app';
+const FROM_ADDRESS = process.env.MAIL_FROM_ADDRESS || 'noreply@chofam.web.app';
 
 let initialized = false;
 function ensureInitialized() {
