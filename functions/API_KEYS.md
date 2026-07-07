@@ -1,6 +1,6 @@
 # 메일 API 키 발급 가이드
 
-`chofam` Functions(`/api/mail/*`)를 호출하는 각 서비스(게임서버, 매니저 웹페이지 등)는
+`cho-fam` Functions(`/api/mail/*`)를 호출하는 각 서비스(게임서버, 매니저 웹페이지 등)는
 고유한 API 키를 발급받아 `x-api-key` 헤더로 인증합니다. 키 자체는 Firebase Secret
 (`MAIL_API_KEYS`)에 JSON 맵 형태로 저장되며, 코드나 git에는 절대 커밋하지 않습니다.
 
@@ -18,7 +18,7 @@ openssl rand -hex 32
 
 ```
 liv-ay     -> sk_liv_ay_7f3a1c9e4b2d8f6a0c5e9b3d7f1a2c4e
-chofam-admin -> sk_admin_2b6e0a4c8f1d5b9e3a7c1f5b9d3a7e1c
+cho-fam-admin -> sk_admin_2b6e0a4c8f1d5b9e3a7c1f5b9d3a7e1c
 ```
 
 ## 2. `MAIL_API_KEYS` 시크릿에 등록
@@ -32,17 +32,17 @@ firebase functions:secrets:set MAIL_API_KEYS
 프롬프트가 뜨면 아래와 같은 JSON 한 줄을 입력합니다 (이미 발급된 키는 유지하고 추가만 합니다):
 
 ```json
-{"sk_liv_ay_7f3a1c9e4b2d8f6a0c5e9b3d7f1a2c4e":"liv-ay","sk_admin_2b6e0a4c8f1d5b9e3a7c1f5b9d3a7e1c":"chofam-admin"}
+{"sk_liv_ay_7f3a1c9e4b2d8f6a0c5e9b3d7f1a2c4e":"liv-ay","sk_admin_2b6e0a4c8f1d5b9e3a7c1f5b9d3a7e1c":"cho-fam-admin"}
 ```
 
-- `source` 값(`liv-ay`, `chofam-admin` 등)은 `mail_logs`에 그대로 기록되어, 매니저
+- `source` 값(`liv-ay`, `cho-fam-admin` 등)은 `mail_logs`에 그대로 기록되어, 매니저
   웹페이지(`/admin/mail/`)에서 서비스별 필터로 사용됩니다.
 - 관리자(로그 조회/재전송) 권한이 필요한 서비스는 `MAIL_ADMIN_SOURCES`에도 해당
-  `source` 이름을 추가해야 합니다 (기본값: `chofam-admin`).
+  `source` 이름을 추가해야 합니다 (기본값: `cho-fam-admin`).
 
 ```bash
 firebase functions:secrets:set MAIL_ADMIN_SOURCES
-# 입력 예: chofam-admin,liv-ay-ops
+# 입력 예: cho-fam-admin,liv-ay-ops
 ```
 
 ## 3. 배포
@@ -70,7 +70,7 @@ firebase emulators:start --only functions
 발송 시 헤더로 전달합니다.
 
 ```bash
-curl -X POST https://chofam.web.app/api/mail/send \
+curl -X POST https://cho-fam.web.app/api/mail/send \
   -H "x-api-key: sk_liv_ay_7f3a1c9e4b2d8f6a0c5e9b3d7f1a2c4e" \
   -H "Content-Type: application/json" \
   -d '{"to":"user@example.com","templateId":"d-xxxxxxxx","dynamicData":{"code":"123456"}}'
