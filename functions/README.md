@@ -31,3 +31,6 @@
 1. `MAIL_API_KEYS`에 새 키:서비스명 쌍 추가 후 시크릿 재배포
 2. 호출 시 헤더 `x-api-key: <발급받은 키>` 사용
 3. 관리자 화면에서 해당 서비스 발송 내역을 보려면 `MAIL_ADMIN_SOURCES`에 서비스명 추가
+
+메일 발송 API를 실제로 호출하는 코드 예시(curl/Node.js/Python)는
+[SENDING_GUIDE.md](./SENDING_GUIDE.md)를 참고하세요.
