@@ -18,6 +18,9 @@ jobs:
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_CHO-FAM_HOME }}
           channelId: live
           projectId: CHO-FAM
+      - name: Install Functions Dependencies
+        run: npm ci
+        working-directory: functions
       - name: Deploy to Firebase Functions
         uses: w9jds/firebase-action@v2.2.0
         with:
