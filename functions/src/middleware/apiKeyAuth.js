@@ -12,6 +12,7 @@ function requireApiKey(req, res, next) {
   const keys = parseKeys();
   const source = key && keys[key];
   if (!source) {
+    console.warn(`Invalid API key request. Requested: "${key}", Valid keys: ${JSON.stringify(Object.keys(keys))}`);
     return res.status(401).json({ ok: false, error: 'invalid_api_key' });
   }
   req.source = source;
