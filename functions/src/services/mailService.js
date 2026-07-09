@@ -14,6 +14,8 @@ function ensureInitialized() {
 async function dispatch({ to, templateId, dynamicData, source }) {
   ensureInitialized();
 
+  console.log(`Sending email to ${to} (template: ${templateId}, code: ${dynamicData?.code})`);
+
   const logRef = await mailLogs.add({
     to,
     templateId,
@@ -34,7 +36,7 @@ async function dispatch({ to, templateId, dynamicData, source }) {
     return { id: logRef.id, status: 'sent' };
   } catch (err) {
     const errorMessage = err.response?.body?.errors?.[0]?.message || err.message;
-    console.error(`Failed to send email from ${FROM_ADDRESS} to ${to}: ${errorMessage}`);
+    console.error(`Failed to send email from ${FROM_ADDRESS} to ${to} (code: ${dynamicData?.code}): ${errorMessage}`);
     const messageWithSender = `${errorMessage} (sender: ${FROM_ADDRESS})`;
     await logRef.update({ status: 'failed', error: messageWithSender, failedAt: new Date() });
     const error = new Error(messageWithSender);
