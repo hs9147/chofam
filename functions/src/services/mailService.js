@@ -34,8 +34,10 @@ async function dispatch({ to, templateId, dynamicData, source }) {
     return { id: logRef.id, status: 'sent' };
   } catch (err) {
     const errorMessage = err.response?.body?.errors?.[0]?.message || err.message;
-    await logRef.update({ status: 'failed', error: errorMessage, failedAt: new Date() });
-    const error = new Error(errorMessage);
+    console.error(`Failed to send email from ${FROM_ADDRESS} to ${to}: ${errorMessage}`);
+    const messageWithSender = `${errorMessage} (sender: ${FROM_ADDRESS})`;
+    await logRef.update({ status: 'failed', error: messageWithSender, failedAt: new Date() });
+    const error = new Error(messageWithSender);
     error.status = 502;
     throw error;
   }
