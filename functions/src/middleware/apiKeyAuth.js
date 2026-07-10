@@ -1,3 +1,4 @@
+let cachedRawEnv = undefined;
 let cachedKeys = null;
 
 function parseKeys() {
@@ -6,6 +7,13 @@ function parseKeys() {
   }
 
   const rawEnv = process.env.MAIL_API_KEYS;
+
+  if (cachedRawEnv === rawEnv && cachedKeys !== null) {
+    return cachedKeys;
+  }
+
+  cachedRawEnv = rawEnv;
+
   if (!rawEnv) {
     console.warn('[AuthDebug] MAIL_API_KEYS environment variable is not defined or empty.');
     cachedKeys = {};
@@ -22,21 +30,19 @@ function parseKeys() {
     }
     maskedRaw = JSON.stringify(maskedObj);
   } catch (e) {
-    maskedRaw = rawEnv.length > 15 
-      ? `${rawEnv.substring(0, 10)}... (Length: ${rawEnv.length})` 
-      : 'Invalid format/Too short';
+    maskedRaw = 'Invalid format/Too short';
   }
 
   console.log(`[AuthDebug] Loading MAIL_API_KEYS. Raw (Masked): ${maskedRaw}`);
 
   try {
     cachedKeys = JSON.parse(rawEnv);
-    return cachedKeys;
   } catch (err) {
     console.error('[AuthDebug] Failed to parse MAIL_API_KEYS JSON', err);
     cachedKeys = {};
-    return cachedKeys;
   }
+
+  return cachedKeys;
 }
 
 function requireApiKey(req, res, next) {
@@ -58,10 +64,14 @@ function requireApiKey(req, res, next) {
   next();
 }
 
+let cachedAdminSources = null;
+
 function requireAdmin(req, res, next) {
-  const adminSources = (process.env.MAIL_ADMIN_SOURCES || 'cho-fam-admin').split(',');
-  if (!adminSources.includes(req.source)) {
-    console.warn(`[AuthError] Forbidden. Requested Source: '${req.source}', Required Admin Sources: [${adminSources.join(', ')}]`);
+  if (!cachedAdminSources) {
+    cachedAdminSources = (process.env.MAIL_ADMIN_SOURCES || 'cho-fam-admin').split(',');
+  }
+  if (!cachedAdminSources.includes(req.source)) {
+    console.warn(`[AuthError] Forbidden. Requested Source: '${req.source}', Required Admin Sources: [${cachedAdminSources.join(', ')}]`);
     return res.status(403).json({ ok: false, error: 'forbidden' });
   }
   next();

@@ -1,133 +1,248 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ko">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>메일 로그 - CHO-FAM Admin</title>
-  <meta name="robots" content="noindex, nofollow">
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: -apple-system, 'Noto Sans KR', sans-serif; color: #e8e8f0; background: #11121c; }
-    header { padding: 20px 28px; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
-    header h1 { font-size: 18px; font-weight: 700; }
-    main { max-width: 1100px; margin: 0 auto; padding: 24px 28px 60px; }
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>메일 로그 - CHO-FAM Admin</title>
+    <meta name="robots" content="noindex, nofollow" />
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        font-family: -apple-system, "Noto Sans KR", sans-serif;
+        color: #e8e8f0;
+        background: #11121c;
+      }
+      header {
+        padding: 20px 28px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+      header h1 {
+        font-size: 18px;
+        font-weight: 700;
+      }
+      main {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 24px 28px 60px;
+      }
 
-    .controls { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; align-items: center; }
-    .controls input, .controls select {
-      background: #1a1b2a; border: 1px solid rgba(255,255,255,0.12); color: #e8e8f0;
-      padding: 8px 12px; border-radius: 6px; font-size: 13px;
-    }
-    .controls input[type="password"] { min-width: 220px; }
-    button {
-      background: #4a6cf7; color: #fff; border: none; padding: 8px 16px;
-      border-radius: 6px; font-size: 13px; font-weight: 700; cursor: pointer;
-    }
-    button:hover { background: #3a5ce0; }
-    button.secondary { background: rgba(255,255,255,0.1); }
-    button.secondary:hover { background: rgba(255,255,255,0.18); }
-    button:disabled { opacity: 0.5; cursor: not-allowed; }
+      .controls {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-bottom: 20px;
+        align-items: center;
+      }
+      .controls input,
+      .controls select {
+        background: #1a1b2a;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        color: #e8e8f0;
+        padding: 8px 12px;
+        border-radius: 6px;
+        font-size: 13px;
+      }
+      .controls input[type="password"] {
+        min-width: 220px;
+      }
+      button {
+        background: #4a6cf7;
+        color: #fff;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 6px;
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      button:hover {
+        background: #3a5ce0;
+      }
+      button.secondary {
+        background: rgba(255, 255, 255, 0.1);
+      }
+      button.secondary:hover {
+        background: rgba(255, 255, 255, 0.18);
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
 
-    table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.06); vertical-align: top; }
-    th { color: rgba(255,255,255,0.5); font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
-    td.mono { font-family: monospace; font-size: 12px; color: rgba(255,255,255,0.7); }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      th,
+      td {
+        padding: 10px 12px;
+        text-align: left;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        vertical-align: top;
+      }
+      th {
+        color: rgba(255, 255, 255, 0.5);
+        font-weight: 700;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      td.mono {
+        font-family: monospace;
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.7);
+      }
 
-    .status { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 700; }
-    .status.sent { background: rgba(76,217,100,0.15); color: #4cd964; }
-    .status.failed { background: rgba(255,69,58,0.15); color: #ff453a; }
-    .status.pending { background: rgba(255,204,0,0.15); color: #ffcc00; }
+      .status {
+        display: inline-block;
+        padding: 2px 10px;
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: 700;
+      }
+      .status.sent {
+        background: rgba(76, 217, 100, 0.15);
+        color: #4cd964;
+      }
+      .status.failed {
+        background: rgba(255, 69, 58, 0.15);
+        color: #ff453a;
+      }
+      .status.pending {
+        background: rgba(255, 204, 0, 0.15);
+        color: #ffcc00;
+      }
 
-    .empty, .error { padding: 40px 0; text-align: center; color: rgba(255,255,255,0.4); font-size: 14px; }
-    .error { color: #ff453a; }
-  </style>
-</head>
-<body>
-  <header>
-    <h1>CHO-FAM 메일 로그</h1>
-    <span style="font-size:12px;color:rgba(255,255,255,0.4)">/api/mail</span>
-  </header>
+      .empty,
+      .error {
+        padding: 40px 0;
+        text-align: center;
+        color: rgba(255, 255, 255, 0.4);
+        font-size: 14px;
+      }
+      .error {
+        color: #ff453a;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>CHO-FAM 메일 로그</h1>
+      <span style="font-size: 12px; color: rgba(255, 255, 255, 0.4)"
+        >/api/mail</span
+      >
+    </header>
 
-  <main>
-    <div class="controls">
-      <input id="apiKey" type="password" placeholder="Admin API Key" />
-      <select id="sourceFilter">
-        <option value="">모든 서비스</option>
-        <option value="liv-ay">liv-ay</option>
-        <option value="CHO-FAM-admin">CHO-FAM-admin</option>
-      </select>
-      <select id="statusFilter">
-        <option value="">모든 상태</option>
-        <option value="sent">sent</option>
-        <option value="failed">failed</option>
-        <option value="pending">pending</option>
-      </select>
-      <button id="loadBtn">조회</button>
-    </div>
+    <main>
+      <div class="controls">
+        <input id="apiKey" type="password" placeholder="Admin API Key" />
+        <select id="sourceFilter">
+          <option value="">모든 서비스</option>
+          <option value="liv-ay">liv-ay</option>
+          <option value="CHO-FAM-admin">CHO-FAM-admin</option>
+        </select>
+        <select id="statusFilter">
+          <option value="">모든 상태</option>
+          <option value="sent">sent</option>
+          <option value="failed">failed</option>
+          <option value="pending">pending</option>
+        </select>
+        <button id="loadBtn">조회</button>
+      </div>
 
-    <div id="result">
-      <div class="empty">API Key를 입력하고 조회 버튼을 누르세요.</div>
-    </div>
-  </main>
+      <div id="result">
+        <div class="empty">API Key를 입력하고 조회 버튼을 누르세요.</div>
+      </div>
+    </main>
 
-  <script>
-    const API_BASE = '/api/mail';
-    const resultEl = document.getElementById('result');
-    const apiKeyEl = document.getElementById('apiKey');
-    const sourceEl = document.getElementById('sourceFilter');
-    const statusEl = document.getElementById('statusFilter');
+    <script>
+      const API_BASE = "/api/mail";
+      const resultEl = document.getElementById("result");
+      const apiKeyEl = document.getElementById("apiKey");
+      const sourceEl = document.getElementById("sourceFilter");
+      const statusEl = document.getElementById("statusFilter");
 
-    apiKeyEl.value = sessionStorage.getItem('CHO-FAM_admin_key') || '';
+      apiKeyEl.value = sessionStorage.getItem("CHO-FAM_admin_key") || "";
 
-    function fmtDate(value) {
-      if (!value) return '-';
-      const d = value._seconds ? new Date(value._seconds * 1000) : new Date(value);
-      return isNaN(d) ? '-' : d.toLocaleString('ko-KR');
-    }
+      function fmtDate(value) {
+        if (!value) return "-";
+        const d = value._seconds
+          ? new Date(value._seconds * 1000)
+          : new Date(value);
+        return isNaN(d) ? "-" : d.toLocaleString("ko-KR");
+      }
 
-    async function loadLogs() {
-      const key = apiKeyEl.value.trim();
-      if (!key) { resultEl.innerHTML = '<div class="error">API Key를 입력하세요.</div>'; return; }
-      sessionStorage.setItem('CHO-FAM_admin_key', key);
-
-      const params = new URLSearchParams();
-      if (sourceEl.value) params.set('source', sourceEl.value);
-      if (statusEl.value) params.set('status', statusEl.value);
-
-      resultEl.innerHTML = '<div class="empty">불러오는 중...</div>';
-      try {
-        const res = await fetch(`${API_BASE}/logs?${params.toString()}`, {
-          headers: { 'x-api-key': key },
-        });
-        const data = await res.json();
-        if (!res.ok || !data.ok) {
-          resultEl.innerHTML = `<div class="error">${data.error || res.status}</div>`;
+      async function loadLogs() {
+        const key = apiKeyEl.value.trim();
+        if (!key) {
+          resultEl.innerHTML = '<div class="error">API Key를 입력하세요.</div>';
           return;
         }
-        renderTable(data.logs);
-      } catch (err) {
-        resultEl.innerHTML = `<div class="error">${err.message}</div>`;
-      }
-    }
+        sessionStorage.setItem("CHO-FAM_admin_key", key);
 
-    function renderTable(logs) {
-      if (!logs.length) {
-        resultEl.innerHTML = '<div class="empty">기록이 없습니다.</div>';
-        return;
+        const params = new URLSearchParams();
+        if (sourceEl.value) params.set("source", sourceEl.value);
+        if (statusEl.value) params.set("status", statusEl.value);
+
+        resultEl.innerHTML = '<div class="empty">불러오는 중...</div>';
+        try {
+          const res = await fetch(`${API_BASE}/logs?${params.toString()}`, {
+            headers: { "x-api-key": key },
+          });
+          const data = await res.json();
+          if (!res.ok || !data.ok) {
+            const div = document.createElement("div");
+            div.className = "error";
+            div.textContent = data.error || res.status;
+            resultEl.innerHTML = "";
+            resultEl.appendChild(div);
+            return;
+          }
+          renderTable(data.logs);
+        } catch (err) {
+          const div = document.createElement("div");
+          div.className = "error";
+          div.textContent = err.message;
+          resultEl.innerHTML = "";
+          resultEl.appendChild(div);
+        }
       }
-      const rows = logs.map((log) => `
+
+      function renderTable(logs) {
+        if (!logs.length) {
+          resultEl.innerHTML = '<div class="empty">기록이 없습니다.</div>';
+          return;
+        }
+        const rows = logs
+          .map(
+            (log) => `
         <tr>
-          <td class="mono">${log.to || '-'}</td>
-          <td>${log.templateId || '-'}</td>
-          <td>${log.source || '-'}</td>
+          <td class="mono">${log.to || "-"}</td>
+          <td>${log.templateId || "-"}</td>
+          <td>${log.source || "-"}</td>
           <td><span class="status ${log.status}">${log.status}</span></td>
           <td class="mono">${fmtDate(log.createdAt)}</td>
-          <td>${log.status === 'failed'
-            ? `<button class="secondary" data-id="${log.id}">재전송</button>`
-            : ''}</td>
+          <td>${
+            log.status === "failed"
+              ? `<button class="secondary" data-id="${log.id}">재전송</button>`
+              : ""
+          }</td>
         </tr>
-      `).join('');
+      `,
+          )
+          .join("");
 
-      resultEl.innerHTML = `
+        resultEl.innerHTML = `
         <table>
           <thead>
             <tr><th>수신자</th><th>템플릿</th><th>서비스</th><th>상태</th><th>생성 시각</th><th></th></tr>
@@ -136,30 +251,30 @@
         </table>
       `;
 
-      resultEl.querySelectorAll('button[data-id]').forEach((btn) => {
-        btn.addEventListener('click', () => resend(btn.dataset.id, btn));
-      });
-    }
-
-    async function resend(logId, btn) {
-      btn.disabled = true;
-      btn.textContent = '전송 중...';
-      try {
-        const res = await fetch(`${API_BASE}/logs/${logId}/resend`, {
-          method: 'POST',
-          headers: { 'x-api-key': apiKeyEl.value.trim() },
+        resultEl.querySelectorAll("button[data-id]").forEach((btn) => {
+          btn.addEventListener("click", () => resend(btn.dataset.id, btn));
         });
-        const data = await res.json();
-        if (!res.ok || !data.ok) throw new Error(data.error || res.status);
-        loadLogs();
-      } catch (err) {
-        btn.disabled = false;
-        btn.textContent = '재전송 실패 (재시도)';
-        console.error(err);
       }
-    }
 
-    document.getElementById('loadBtn').addEventListener('click', loadLogs);
-  </script>
-</body>
+      async function resend(logId, btn) {
+        btn.disabled = true;
+        btn.textContent = "전송 중...";
+        try {
+          const res = await fetch(`${API_BASE}/logs/${logId}/resend`, {
+            method: "POST",
+            headers: { "x-api-key": apiKeyEl.value.trim() },
+          });
+          const data = await res.json();
+          if (!res.ok || !data.ok) throw new Error(data.error || res.status);
+          loadLogs();
+        } catch (err) {
+          btn.disabled = false;
+          btn.textContent = "재전송 실패 (재시도)";
+          console.error(err);
+        }
+      }
+
+      document.getElementById("loadBtn").addEventListener("click", loadLogs);
+    </script>
+  </body>
 </html>
