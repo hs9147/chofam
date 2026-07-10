@@ -15,9 +15,7 @@ function parseKeys() {
     }
     maskedRaw = JSON.stringify(maskedObj);
   } catch (e) {
-    maskedRaw = rawEnv.length > 15 
-      ? `${rawEnv.substring(0, 10)}... (Length: ${rawEnv.length})` 
-      : 'Invalid format/Too short';
+    maskedRaw = 'Invalid format/Too short';
   }
 
   console.log(`[AuthDebug] Loading MAIL_API_KEYS. Raw (Masked): ${maskedRaw}`);
