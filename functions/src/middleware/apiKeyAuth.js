@@ -1,4 +1,3 @@
-let cachedRawEnv = undefined;
 let cachedKeys = null;
 
 function parseKeys() {
@@ -37,6 +36,7 @@ function parseKeys() {
 
   try {
     cachedKeys = JSON.parse(rawEnv);
+    return cachedKeys;
   } catch (err) {
     console.error('[AuthDebug] Failed to parse MAIL_API_KEYS JSON', err);
     cachedKeys = {};
