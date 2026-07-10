@@ -7,12 +7,18 @@ const router = express.Router();
 
 router.use(requireApiKey);
 
+// Regular expression for basic email validation
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 // POST /mail/send  { to, templateKey, location, dynamicData }
 router.post('/send', async (req, res, next) => {
   try {
     const { to, templateKey, location, dynamicData } = req.body || {};
     if (!to) {
       return res.status(400).json({ ok: false, error: 'to_required' });
+    }
+    if (!emailRegex.test(to)) {
+      return res.status(400).json({ ok: false, error: 'invalid_email_format' });
     }
     if (!templateKey) {
       return res.status(400).json({ ok: false, error: 'templateKey_required' });
