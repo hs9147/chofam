@@ -82,4 +82,4 @@ async function resend(logId) {
   return dispatch({ to, templateKey, location, dynamicData, source });
 }
 
-module.exports = { dispatch, resend };
+module.exports = { dispatch, resend, renderTemplate };
