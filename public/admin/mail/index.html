@@ -119,30 +119,6 @@
       }
     }
 
-        resultEl.innerHTML = '<div class="empty">불러오는 중...</div>';
-        try {
-          const res = await fetch(`${API_BASE}/logs?${params.toString()}`, {
-            headers: { "x-api-key": key },
-          });
-          const data = await res.json();
-          if (!res.ok || !data.ok) {
-            const div = document.createElement("div");
-            div.className = "error";
-            div.textContent = data.error || res.status;
-            resultEl.innerHTML = "";
-            resultEl.appendChild(div);
-            return;
-          }
-          renderTable(data.logs);
-        } catch (err) {
-          const div = document.createElement("div");
-          div.className = "error";
-          div.textContent = err.message;
-          resultEl.innerHTML = "";
-          resultEl.appendChild(div);
-        }
-      }
-
       function renderTable(logs) {
         if (!logs.length) {
           resultEl.innerHTML = '<div class="empty">기록이 없습니다.</div>';
@@ -153,7 +129,7 @@
             (log) => `
         <tr>
           <td class="mono">${escapeHTML(log.to) || '-'}</td>
-          <td>${escapeHTML(log.templateId) || '-'}</td>
+          <td>${escapeHTML(log.templateKey) || '-'}</td>
           <td>${escapeHTML(log.source) || '-'}</td>
           <td><span class="status ${escapeHTML(log.status)}">${escapeHTML(log.status)}</span></td>
           <td class="mono">${escapeHTML(fmtDate(log.createdAt))}</td>

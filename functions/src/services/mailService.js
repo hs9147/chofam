@@ -10,16 +10,26 @@ async function getTemplate(templateKey) {
   const now = Date.now();
   const cached = templateCache.get(templateKey);
   if (cached && (now - cached.timestamp < CACHE_TTL)) {
-    return cached.data;
+    return cached.promise;
   }
-  const doc = await mailTemplates.doc(templateKey).get();
-  if (!doc.exists) {
-    templateCache.set(templateKey, { data: null, timestamp: now });
-    return null;
-  }
-  const data = doc.data();
-  templateCache.set(templateKey, { data, timestamp: now });
-  return data;
+  const promise = (async () => {
+    const doc = await mailTemplates.doc(templateKey).get();
+    if (!doc.exists) {
+      return null;
+    }
+    return doc.data();
+  })();
+
+  templateCache.set(templateKey, { promise, timestamp: now });
+
+  // Remove failed promise from cache to allow future retries
+  promise.catch(() => {
+    if (templateCache.get(templateKey)?.promise === promise) {
+      templateCache.delete(templateKey);
+    }
+  });
+
+  return promise;
 }
 
 function invalidateTemplateCache(templateKey) {
@@ -49,16 +59,6 @@ async function dispatch({ to, templateKey, location = 'ko', dynamicData = {}, so
   // Prefetch template (using cache)
   const templateData = await getTemplate(templateKey);
 
-  const logRef = await mailLogs.add({
-    to,
-    templateKey,
-    location,
-    dynamicData,
-    source,
-    status: 'pending',
-    createdAt: new Date(),
-  });
-
   try {
     let mailOptions = {
       to,
@@ -82,13 +82,32 @@ async function dispatch({ to, templateKey, location = 'ko', dynamicData = {}, so
     mailOptions.html = html;
 
     await sgMail.send(mailOptions);
-    await logRef.update({ status: 'sent', sentAt: new Date() });
+    const logRef = await mailLogs.add({
+      to,
+      templateKey,
+      location,
+      dynamicData,
+      source,
+      status: 'sent',
+      createdAt: new Date(),
+      sentAt: new Date(),
+    });
     return { id: logRef.id, status: 'sent' };
   } catch (err) {
     const errorMessage = err.response?.body?.errors?.[0]?.message || err.message;
     console.error(`Failed to send email to ${to}: ${errorMessage}`);
     const messageWithSender = `${errorMessage} (sender: ${FROM_ADDRESS})`;
-    await logRef.update({ status: 'failed', error: messageWithSender, failedAt: new Date() });
+    const logRef = await mailLogs.add({
+      to,
+      templateKey,
+      location,
+      dynamicData,
+      source,
+      status: 'failed',
+      error: messageWithSender,
+      createdAt: new Date(),
+      failedAt: new Date(),
+    });
     const error = new Error(messageWithSender);
     error.status = 502;
     throw error;
