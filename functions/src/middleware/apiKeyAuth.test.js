@@ -1,4 +1,4 @@
-const { requireApiKey } = require('./apiKeyAuth');
+const { requireApiKey, resetCache, requireAdmin } = require('./apiKeyAuth');
 
 describe('requireApiKey middleware', () => {
   let req;
