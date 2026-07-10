@@ -1,5 +1,3 @@
-const { requireAdmin } = require('./apiKeyAuth');
-
 describe('requireAdmin middleware', () => {
   let req;
   let res;
@@ -9,7 +7,7 @@ describe('requireAdmin middleware', () => {
   beforeEach(() => {
     jest.resetModules();
     process.env = { ...originalEnv };
-    req = {};
+    req = { header: jest.fn() };
     res = {
       status: jest.fn().mockReturnThis(),
       json: jest.fn(),
@@ -30,6 +28,7 @@ describe('requireAdmin middleware', () => {
 
   it('should authenticate with a valid API key and set req.source', () => {
     process.env.MAIL_API_KEYS = JSON.stringify({ 'valid-key-123': 'service-a' });
+    const { requireApiKey } = require('./apiKeyAuth');
     req.header.mockReturnValue('valid-key-123');
 
     requireApiKey(req, res, next);
@@ -41,6 +40,8 @@ describe('requireAdmin middleware', () => {
   });
 
   it('should reject when MAIL_API_KEYS env is missing', () => {
+    delete process.env.MAIL_API_KEYS;
+    const { requireApiKey } = require('./apiKeyAuth');
     req.header.mockReturnValue('valid-key-123');
 
     requireApiKey(req, res, next);
@@ -52,6 +53,7 @@ describe('requireAdmin middleware', () => {
 
   it('should reject when MAIL_API_KEYS is invalid JSON', () => {
     process.env.MAIL_API_KEYS = 'invalid-json';
+    const { requireApiKey } = require('./apiKeyAuth');
     req.header.mockReturnValue('valid-key-123');
 
     requireApiKey(req, res, next);
@@ -63,6 +65,7 @@ describe('requireAdmin middleware', () => {
 
   it('should reject when API key is missing from request header', () => {
     process.env.MAIL_API_KEYS = JSON.stringify({ 'valid-key-123': 'service-a' });
+    const { requireApiKey } = require('./apiKeyAuth');
     req.header.mockReturnValue(undefined);
 
     requireApiKey(req, res, next);
@@ -74,6 +77,7 @@ describe('requireAdmin middleware', () => {
 
   it('should reject when API key is invalid', () => {
     process.env.MAIL_API_KEYS = JSON.stringify({ 'valid-key-123': 'service-a' });
+    const { requireApiKey } = require('./apiKeyAuth');
     req.header.mockReturnValue('invalid-key-456');
 
     requireApiKey(req, res, next);
