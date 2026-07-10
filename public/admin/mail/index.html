@@ -78,6 +78,16 @@
 
     apiKeyEl.value = sessionStorage.getItem('CHO-FAM_admin_key') || '';
 
+    function escapeHTML(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
     function fmtDate(value) {
       if (!value) return '-';
       const d = value._seconds ? new Date(value._seconds * 1000) : new Date(value);
@@ -100,12 +110,12 @@
         });
         const data = await res.json();
         if (!res.ok || !data.ok) {
-          resultEl.innerHTML = `<div class="error">${data.error || res.status}</div>`;
+          resultEl.innerHTML = `<div class="error">${escapeHTML(data.error || res.status)}</div>`;
           return;
         }
         renderTable(data.logs);
       } catch (err) {
-        resultEl.innerHTML = `<div class="error">${err.message}</div>`;
+        resultEl.innerHTML = `<div class="error">${escapeHTML(err.message)}</div>`;
       }
     }
 
@@ -116,13 +126,13 @@
       }
       const rows = logs.map((log) => `
         <tr>
-          <td class="mono">${log.to || '-'}</td>
-          <td>${log.templateId || '-'}</td>
-          <td>${log.source || '-'}</td>
-          <td><span class="status ${log.status}">${log.status}</span></td>
-          <td class="mono">${fmtDate(log.createdAt)}</td>
+          <td class="mono">${escapeHTML(log.to) || '-'}</td>
+          <td>${escapeHTML(log.templateId) || '-'}</td>
+          <td>${escapeHTML(log.source) || '-'}</td>
+          <td><span class="status ${escapeHTML(log.status)}">${escapeHTML(log.status)}</span></td>
+          <td class="mono">${escapeHTML(fmtDate(log.createdAt))}</td>
           <td>${log.status === 'failed'
-            ? `<button class="secondary" data-id="${log.id}">재전송</button>`
+            ? `<button class="secondary" data-id="${escapeHTML(log.id)}">재전송</button>`
             : ''}</td>
         </tr>
       `).join('');
