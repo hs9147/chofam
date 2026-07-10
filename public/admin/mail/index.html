@@ -201,15 +201,20 @@
           });
           const data = await res.json();
           if (!res.ok || !data.ok) {
-            resultEl.innerHTML = '<div class="error"></div>';
-            resultEl.querySelector(".error").textContent =
-              data.error || res.status;
+            const div = document.createElement("div");
+            div.className = "error";
+            div.textContent = data.error || res.status;
+            resultEl.innerHTML = "";
+            resultEl.appendChild(div);
             return;
           }
           renderTable(data.logs);
         } catch (err) {
-          resultEl.innerHTML = '<div class="error"></div>';
-          resultEl.querySelector(".error").textContent = err.message;
+          const div = document.createElement("div");
+          div.className = "error";
+          div.textContent = err.message;
+          resultEl.innerHTML = "";
+          resultEl.appendChild(div);
         }
       }
 
