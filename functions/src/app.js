@@ -6,7 +6,9 @@ const app = express();
 const allowedOrigins = [
   'https://cho-fam.web.app',
   'https://cho-fam.firebaseapp.com',
-  'https://chofam-home.web.app'
+  'https://chofam-home.web.app',
+  'http://localhost:5173',
+  'http://127.0.0.1:5173'
 ];
 
 app.use(cors({ origin: allowedOrigins }));
