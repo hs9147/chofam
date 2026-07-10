@@ -26,62 +26,110 @@ describe('requireApiKey middleware', () => {
   });
 
   afterEach(() => {
-    delete process.env.MAIL_API_KEYS;
+    process.env = originalEnv;
     jest.restoreAllMocks();
   });
 
-  it('should authenticate with a valid API key and set req.source', () => {
-    process.env.MAIL_API_KEYS = JSON.stringify({ 'valid-key-123': 'service-a' });
-    req.header.mockReturnValue('valid-key-123');
+  describe('requireApiKey', () => {
+    it('should authenticate with a valid API key and set req.source', () => {
+      process.env.MAIL_API_KEYS = JSON.stringify({ 'valid-key-123': 'service-a' });
+      req.header.mockReturnValue('valid-key-123');
 
-    requireApiKey(req, res, next);
+      // We need to require it fresh in each test because of caching
+      const { requireApiKey } = require('./apiKeyAuth');
+      requireApiKey(req, res, next);
 
-    expect(req.header).toHaveBeenCalledWith('x-api-key');
-    expect(req.source).toBe('service-a');
-    expect(next).toHaveBeenCalled();
-    expect(res.status).not.toHaveBeenCalled();
+      expect(req.header).toHaveBeenCalledWith('x-api-key');
+      expect(req.source).toBe('service-a');
+      expect(next).toHaveBeenCalled();
+      expect(res.status).not.toHaveBeenCalled();
+    });
+
+    it('should reject when MAIL_API_KEYS env is missing', () => {
+      delete process.env.MAIL_API_KEYS;
+      req.header.mockReturnValue('valid-key-123');
+
+      const { requireApiKey } = require('./apiKeyAuth');
+      requireApiKey(req, res, next);
+
+      expect(next).not.toHaveBeenCalled();
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.json).toHaveBeenCalledWith({ ok: false, error: 'invalid_api_key' });
+    });
+
+    it('should reject when MAIL_API_KEYS is invalid JSON', () => {
+      process.env.MAIL_API_KEYS = 'invalid-json';
+      req.header.mockReturnValue('valid-key-123');
+
+      const { requireApiKey } = require('./apiKeyAuth');
+      requireApiKey(req, res, next);
+
+      expect(next).not.toHaveBeenCalled();
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.json).toHaveBeenCalledWith({ ok: false, error: 'invalid_api_key' });
+    });
+
+    it('should reject when API key is missing from request header', () => {
+      process.env.MAIL_API_KEYS = JSON.stringify({ 'valid-key-123': 'service-a' });
+      req.header.mockReturnValue(undefined);
+
+      const { requireApiKey } = require('./apiKeyAuth');
+      requireApiKey(req, res, next);
+
+      expect(next).not.toHaveBeenCalled();
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.json).toHaveBeenCalledWith({ ok: false, error: 'invalid_api_key' });
+    });
+
+    it('should reject when API key is invalid', () => {
+      process.env.MAIL_API_KEYS = JSON.stringify({ 'valid-key-123': 'service-a' });
+      req.header.mockReturnValue('invalid-key-456');
+
+      const { requireApiKey } = require('./apiKeyAuth');
+      requireApiKey(req, res, next);
+
+      expect(next).not.toHaveBeenCalled();
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.json).toHaveBeenCalledWith({ ok: false, error: 'invalid_api_key' });
+    });
   });
 
-  it('should reject when MAIL_API_KEYS env is missing', () => {
-    req.header.mockReturnValue('valid-key-123');
+  describe('requireAdmin middleware', () => {
+    it('should allow access if req.source is in admin sources (default)', () => {
+      req.source = 'cho-fam-admin';
+      const { requireAdmin } = require('./apiKeyAuth');
+      requireAdmin(req, res, next);
+      expect(next).toHaveBeenCalled();
+      expect(res.status).not.toHaveBeenCalled();
+    });
 
-    requireApiKey(req, res, next);
+    it('should allow access if req.source is in admin sources (custom)', () => {
+      process.env.MAIL_ADMIN_SOURCES = 'admin1,admin2';
+      const { requireAdmin } = require('./apiKeyAuth');
+      req.source = 'admin2';
+      requireAdmin(req, res, next);
+      expect(next).toHaveBeenCalled();
+      expect(res.status).not.toHaveBeenCalled();
+    });
 
-    expect(next).not.toHaveBeenCalled();
-    expect(res.status).toHaveBeenCalledWith(401);
-    expect(res.json).toHaveBeenCalledWith({ ok: false, error: 'invalid_api_key' });
-  });
+    it('should block access if req.source is not in admin sources', () => {
+      const { requireAdmin } = require('./apiKeyAuth');
+      req.source = 'some-other-source';
+      requireAdmin(req, res, next);
+      expect(next).not.toHaveBeenCalled();
+      expect(res.status).toHaveBeenCalledWith(403);
+      expect(res.json).toHaveBeenCalledWith({ ok: false, error: 'forbidden' });
+      expect(console.warn).toHaveBeenCalled();
+    });
 
-  it('should reject when MAIL_API_KEYS is invalid JSON', () => {
-    process.env.MAIL_API_KEYS = 'invalid-json';
-    req.header.mockReturnValue('valid-key-123');
-
-    requireApiKey(req, res, next);
-
-    expect(next).not.toHaveBeenCalled();
-    expect(res.status).toHaveBeenCalledWith(401);
-    expect(res.json).toHaveBeenCalledWith({ ok: false, error: 'invalid_api_key' });
-  });
-
-  it('should reject when API key is missing from request header', () => {
-    process.env.MAIL_API_KEYS = JSON.stringify({ 'valid-key-123': 'service-a' });
-    req.header.mockReturnValue(undefined);
-
-    requireApiKey(req, res, next);
-
-    expect(next).not.toHaveBeenCalled();
-    expect(res.status).toHaveBeenCalledWith(401);
-    expect(res.json).toHaveBeenCalledWith({ ok: false, error: 'invalid_api_key' });
-  });
-
-  it('should reject when API key is invalid', () => {
-    process.env.MAIL_API_KEYS = JSON.stringify({ 'valid-key-123': 'service-a' });
-    req.header.mockReturnValue('invalid-key-456');
-
-    requireApiKey(req, res, next);
-
-    expect(next).not.toHaveBeenCalled();
-    expect(res.status).toHaveBeenCalledWith(401);
-    expect(res.json).toHaveBeenCalledWith({ ok: false, error: 'invalid_api_key' });
+    it('should block access if req.source is undefined', () => {
+      const { requireAdmin } = require('./apiKeyAuth');
+      req.source = undefined;
+      requireAdmin(req, res, next);
+      expect(next).not.toHaveBeenCalled();
+      expect(res.status).toHaveBeenCalledWith(403);
+      expect(res.json).toHaveBeenCalledWith({ ok: false, error: 'forbidden' });
+      expect(console.warn).toHaveBeenCalled();
+    });
   });
 });
