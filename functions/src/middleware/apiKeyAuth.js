@@ -1,8 +1,31 @@
 function parseKeys() {
+  const rawEnv = process.env.MAIL_API_KEYS;
+  if (!rawEnv) {
+    console.warn('[AuthDebug] MAIL_API_KEYS environment variable is not defined or empty.');
+    return {};
+  }
+
+  let maskedRaw = rawEnv;
   try {
-    return JSON.parse(process.env.MAIL_API_KEYS || '{}');
+    const tempObj = JSON.parse(rawEnv);
+    const maskedObj = {};
+    for (const [k, v] of Object.entries(tempObj)) {
+      const maskedKey = k.length > 5 ? `${k.substring(0, 5)}***` : '***';
+      maskedObj[maskedKey] = v;
+    }
+    maskedRaw = JSON.stringify(maskedObj);
+  } catch (e) {
+    maskedRaw = rawEnv.length > 15 
+      ? `${rawEnv.substring(0, 10)}... (Length: ${rawEnv.length})` 
+      : 'Invalid format/Too short';
+  }
+
+  console.log(`[AuthDebug] Loading MAIL_API_KEYS. Raw (Masked): ${maskedRaw}`);
+
+  try {
+    return JSON.parse(rawEnv);
   } catch (err) {
-    console.error('Invalid MAIL_API_KEYS JSON', err);
+    console.error('[AuthDebug] Failed to parse MAIL_API_KEYS JSON', err);
     return {};
   }
 }
