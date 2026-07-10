@@ -1,4 +1,6 @@
-describe('apiKeyAuth middleware', () => {
+const { requireApiKey } = require('./apiKeyAuth');
+
+describe('requireApiKey middleware', () => {
   let req;
   let res;
   let next;
@@ -8,7 +10,7 @@ describe('apiKeyAuth middleware', () => {
     jest.resetModules();
     process.env = { ...originalEnv };
     req = {
-      header: jest.fn(),
+      header: jest.fn()
     };
     res = {
       status: jest.fn().mockReturnThis(),

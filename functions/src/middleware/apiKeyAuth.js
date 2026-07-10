@@ -2,10 +2,6 @@ let cachedRawEnv = null;
 let cachedKeys = null;
 
 function parseKeys() {
-  if (cachedKeys !== null) {
-    return cachedKeys;
-  }
-
   const rawEnv = process.env.MAIL_API_KEYS;
 
   if (cachedRawEnv === rawEnv && cachedKeys !== null) {
