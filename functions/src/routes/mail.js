@@ -99,6 +99,8 @@ router.post('/templates', requireAdmin, asyncHandler(async (req, res, next) => {
     await docRef.set(dataToSave);
   }
 
+  mailService.invalidateTemplateCache(key);
+
   res.json({ ok: true, key });
 }));
 
@@ -110,6 +112,7 @@ router.delete('/templates/:key', requireAdmin, asyncHandler(async (req, res, nex
     return res.status(404).json({ ok: false, error: 'template_not_found' });
   }
   await docRef.delete();
+  mailService.invalidateTemplateCache(req.params.key);
   res.json({ ok: true, key: req.params.key });
 }));
 

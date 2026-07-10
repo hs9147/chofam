@@ -3,6 +3,29 @@ const { mailLogs, mailTemplates } = require('./firestore');
 
 const FROM_ADDRESS = process.env.MAIL_FROM_ADDRESS || 'hichofam@gmail.com';
 
+const templateCache = new Map();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+async function getTemplate(templateKey) {
+  const now = Date.now();
+  const cached = templateCache.get(templateKey);
+  if (cached && (now - cached.timestamp < CACHE_TTL)) {
+    return cached.data;
+  }
+  const doc = await mailTemplates.doc(templateKey).get();
+  if (!doc.exists) {
+    templateCache.set(templateKey, { data: null, timestamp: now });
+    return null;
+  }
+  const data = doc.data();
+  templateCache.set(templateKey, { data, timestamp: now });
+  return data;
+}
+
+function invalidateTemplateCache(templateKey) {
+  templateCache.delete(templateKey);
+}
+
 let initialized = false;
 function ensureInitialized() {
   if (!initialized) {
@@ -23,6 +46,9 @@ async function dispatch({ to, templateKey, location = 'ko', dynamicData = {}, so
 
   console.log(`Sending email to ${to} (templateKey: ${templateKey}, location: ${location})`);
 
+  // Prefetch template (using cache)
+  const templateData = await getTemplate(templateKey);
+
   const logRef = await mailLogs.add({
     to,
     templateKey,
@@ -39,13 +65,11 @@ async function dispatch({ to, templateKey, location = 'ko', dynamicData = {}, so
       from: FROM_ADDRESS,
     };
 
-    const doc = await mailTemplates.doc(templateKey).get();
-    if (!doc.exists) {
+    if (!templateData) {
       throw new Error(`mail_template_not_found: ${templateKey}`);
     }
 
-    const data = doc.data();
-    const localeTemplates = data.templates || {};
+    const localeTemplates = templateData.templates || {};
     const template = localeTemplates[location] || localeTemplates['ko'] || Object.values(localeTemplates)[0];
     if (!template) {
       throw new Error(`no_available_template_locale: ${templateKey}`);
@@ -82,4 +106,4 @@ async function resend(logId) {
   return dispatch({ to, templateKey, location, dynamicData, source });
 }
 
-module.exports = { dispatch, resend, renderTemplate };
+module.exports = { dispatch, resend, renderTemplate, invalidateTemplateCache };

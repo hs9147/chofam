@@ -1,5 +1,7 @@
 let cachedRawEnv = null;
 let cachedKeys = null;
+let cachedRawAdminSourcesEnv = null;
+let cachedAdminSources = null;
 
 function parseKeys() {
   const rawEnv = process.env.MAIL_API_KEYS;
@@ -42,10 +44,22 @@ function parseKeys() {
   return cachedKeys;
 }
 
+function getAdminSources() {
+  const rawEnv = process.env.MAIL_ADMIN_SOURCES || 'cho-fam-admin';
+  if (cachedRawAdminSourcesEnv === rawEnv && cachedAdminSources !== null) {
+    return cachedAdminSources;
+  }
+  cachedRawAdminSourcesEnv = rawEnv;
+  cachedAdminSources = rawEnv.split(',');
+  return cachedAdminSources;
+}
+
 // Reset cache for testing purposes
 function resetCache() {
   cachedKeys = null;
   cachedRawEnv = null;
+  cachedRawAdminSourcesEnv = null;
+  cachedAdminSources = null;
 }
 
 function requireApiKey(req, res, next) {
@@ -68,7 +82,7 @@ function requireApiKey(req, res, next) {
 }
 
 function requireAdmin(req, res, next) {
-  const adminSources = (process.env.MAIL_ADMIN_SOURCES || 'cho-fam-admin').split(',');
+  const adminSources = getAdminSources();
   if (!adminSources.includes(req.source)) {
     console.warn(`[AuthError] Forbidden. Requested Source: '${req.source}', Required Admin Sources: [${adminSources.join(', ')}]`);
     return res.status(403).json({ ok: false, error: 'forbidden' });
