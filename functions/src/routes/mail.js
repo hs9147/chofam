@@ -17,7 +17,7 @@ router.post('/send', async (req, res, next) => {
     if (!to) {
       return res.status(400).json({ ok: false, error: 'to_required' });
     }
-    if (!emailRegex.test(to)) {
+    if (typeof to !== 'string' || !emailRegex.test(to)) {
       return res.status(400).json({ ok: false, error: 'invalid_email_format' });
     }
     if (!templateKey) {
