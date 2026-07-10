@@ -1,4 +1,5 @@
 let cachedKeys = null;
+let cachedRawEnv = null;
 
 function parseKeys() {
   if (cachedKeys !== null) {
@@ -45,6 +46,12 @@ function parseKeys() {
   return cachedKeys;
 }
 
+function resetCacheForTest() {
+  cachedKeys = null;
+  cachedRawEnv = null;
+  cachedAdminSources = null;
+}
+
 function requireApiKey(req, res, next) {
   const rawKey = req.header('x-api-key');
   const key = rawKey ? rawKey.trim() : '';
@@ -77,4 +84,4 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-module.exports = { requireApiKey, requireAdmin };
+module.exports = { requireApiKey, requireAdmin, resetCacheForTest };
