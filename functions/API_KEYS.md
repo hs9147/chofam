@@ -70,7 +70,7 @@ firebase emulators:start --only functions
 발송 시 헤더로 전달합니다.
 
 ```bash
-curl -X POST https://CHO-FAM.web.app/api/mail/send \
+curl -X POST https://cho-fam.web.app/api/mail/send \
   -H "x-api-key: sk_liv_ay_7f3a1c9e4b2d8f6a0c5e9b3d7f1a2c4e" \
   -H "Content-Type: application/json" \
   -d '{"to":"user@example.com","templateId":"d-xxxxxxxx","dynamicData":{"code":"123456"}}'
