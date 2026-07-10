@@ -1,8 +1,19 @@
+let cachedRawEnv = undefined;
+let cachedKeys = null;
+
 function parseKeys() {
   const rawEnv = process.env.MAIL_API_KEYS;
+
+  if (cachedRawEnv === rawEnv && cachedKeys !== null) {
+    return cachedKeys;
+  }
+
+  cachedRawEnv = rawEnv;
+
   if (!rawEnv) {
     console.warn('[AuthDebug] MAIL_API_KEYS environment variable is not defined or empty.');
-    return {};
+    cachedKeys = {};
+    return cachedKeys;
   }
 
   let maskedRaw = rawEnv;
@@ -21,11 +32,13 @@ function parseKeys() {
   console.log(`[AuthDebug] Loading MAIL_API_KEYS. Raw (Masked): ${maskedRaw}`);
 
   try {
-    return JSON.parse(rawEnv);
+    cachedKeys = JSON.parse(rawEnv);
   } catch (err) {
     console.error('[AuthDebug] Failed to parse MAIL_API_KEYS JSON', err);
-    return {};
+    cachedKeys = {};
   }
+
+  return cachedKeys;
 }
 
 function requireApiKey(req, res, next) {
