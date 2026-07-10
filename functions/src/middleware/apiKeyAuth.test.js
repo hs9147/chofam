@@ -1,6 +1,6 @@
-const { requireAdmin } = require('./apiKeyAuth');
+const { requireApiKey, requireAdmin } = require('./apiKeyAuth');
 
-describe('requireAdmin middleware', () => {
+describe('requireApiKey middleware', () => {
   let req;
   let res;
   let next;
@@ -9,7 +9,7 @@ describe('requireAdmin middleware', () => {
   beforeEach(() => {
     jest.resetModules();
     process.env = { ...originalEnv };
-    req = {};
+    req = { header: jest.fn() };
     res = {
       status: jest.fn().mockReturnThis(),
       json: jest.fn(),
@@ -81,5 +81,38 @@ describe('requireAdmin middleware', () => {
     expect(next).not.toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(401);
     expect(res.json).toHaveBeenCalledWith({ ok: false, error: 'invalid_api_key' });
+  });
+});
+
+describe('requireAdmin middleware (isolated)', () => {
+  let req;
+  let res;
+  let next;
+
+  beforeEach(() => {
+    req = {};
+    res = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn(),
+    };
+    next = jest.fn();
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('should call next if req.source is admin', () => {
+    req.source = 'cho-fam-admin';
+    requireAdmin(req, res, next);
+    expect(next).toHaveBeenCalled();
+  });
+
+  it('should return 403 if req.source is not admin', () => {
+    req.source = 'some-other-source';
+    requireAdmin(req, res, next);
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith({ ok: false, error: 'forbidden' });
   });
 });
