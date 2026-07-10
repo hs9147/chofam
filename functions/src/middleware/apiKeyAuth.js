@@ -20,7 +20,7 @@ function requireApiKey(req, res, next) {
 }
 
 function requireAdmin(req, res, next) {
-  const adminSources = (process.env.MAIL_ADMIN_SOURCES || 'CHO-FAM-admin').split(',');
+  const adminSources = (process.env.MAIL_ADMIN_SOURCES || 'cho-fam-admin').split(',');
   if (!adminSources.includes(req.source)) {
     return res.status(403).json({ ok: false, error: 'forbidden' });
   }
