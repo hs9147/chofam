@@ -31,13 +31,18 @@ function parseKeys() {
 }
 
 function requireApiKey(req, res, next) {
-  const key = req.header('x-api-key');
+  const rawKey = req.header('x-api-key');
+  const key = rawKey ? rawKey.trim() : '';
   const keys = parseKeys();
   const source = key && keys[key];
   if (!source) {
-    const maskedReqKey = key ? `${key.substring(0, 3)}***` : 'None';
-    const registeredKeysInfo = Object.keys(keys).map(k => `${k.substring(0, 3)}***`).join(', ');
-    console.warn(`[AuthError] Invalid API key request. Requested Key: ${maskedReqKey}, Currently Registered Keys: [${registeredKeysInfo}]`);
+    const maskedReqKey = key ? `${key.substring(0, 5)}***` : 'None';
+    const reqLen = key ? key.length : 0;
+    const registeredKeysInfo = Object.keys(keys).map(k => {
+      const masked = k.length > 5 ? `${k.substring(0, 5)}***` : '***';
+      return `${masked} (Len: ${k.length})`;
+    }).join(', ');
+    console.warn(`[AuthError] Invalid API key request. Requested Key: ${maskedReqKey} (Len: ${reqLen}), Registered Keys: [${registeredKeysInfo}]`);
     return res.status(401).json({ ok: false, error: 'invalid_api_key' });
   }
   req.source = source;
