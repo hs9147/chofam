@@ -49,10 +49,14 @@ function requireApiKey(req, res, next) {
   next();
 }
 
+let cachedAdminSources = null;
+
 function requireAdmin(req, res, next) {
-  const adminSources = (process.env.MAIL_ADMIN_SOURCES || 'cho-fam-admin').split(',');
-  if (!adminSources.includes(req.source)) {
-    console.warn(`[AuthError] Forbidden. Requested Source: '${req.source}', Required Admin Sources: [${adminSources.join(', ')}]`);
+  if (!cachedAdminSources) {
+    cachedAdminSources = (process.env.MAIL_ADMIN_SOURCES || 'cho-fam-admin').split(',');
+  }
+  if (!cachedAdminSources.includes(req.source)) {
+    console.warn(`[AuthError] Forbidden. Requested Source: '${req.source}', Required Admin Sources: [${cachedAdminSources.join(', ')}]`);
     return res.status(403).json({ ok: false, error: 'forbidden' });
   }
   next();
