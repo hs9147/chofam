@@ -7,19 +7,18 @@ const router = express.Router();
 
 router.use(requireApiKey);
 
-// POST /mail/send  { to, templateId, templateKey, location, dynamicData }
+// POST /mail/send  { to, templateKey, location, dynamicData }
 router.post('/send', async (req, res, next) => {
   try {
-    const { to, templateId, templateKey, location, dynamicData } = req.body || {};
+    const { to, templateKey, location, dynamicData } = req.body || {};
     if (!to) {
       return res.status(400).json({ ok: false, error: 'to_required' });
     }
-    if (!templateId && !templateKey) {
-      return res.status(400).json({ ok: false, error: 'templateId_or_templateKey_required' });
+    if (!templateKey) {
+      return res.status(400).json({ ok: false, error: 'templateKey_required' });
     }
     const result = await mailService.dispatch({
       to,
-      templateId,
       templateKey,
       location,
       dynamicData,
