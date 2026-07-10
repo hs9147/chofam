@@ -18,7 +18,7 @@ function renderTemplate(text, data) {
   });
 }
 
-async function dispatch({ to, templateKey, location = 'ko', dynamicData, source }) {
+async function dispatch({ to, templateKey, location = 'ko', dynamicData = {}, source }) {
   ensureInitialized();
 
   console.log(`Sending email to ${to} (templateKey: ${templateKey}, location: ${location})`);
@@ -27,7 +27,7 @@ async function dispatch({ to, templateKey, location = 'ko', dynamicData, source 
     to,
     templateKey,
     location,
-    dynamicData: dynamicData || {},
+    dynamicData,
     source,
     status: 'pending',
     createdAt: new Date(),
@@ -51,8 +51,8 @@ async function dispatch({ to, templateKey, location = 'ko', dynamicData, source 
       throw new Error(`no_available_template_locale: ${templateKey}`);
     }
 
-    const subject = renderTemplate(template.title, dynamicData || {});
-    const html = renderTemplate(template.body, dynamicData || {});
+    const subject = renderTemplate(template.title, dynamicData);
+    const html = renderTemplate(template.body, dynamicData);
 
     mailOptions.subject = subject;
     mailOptions.html = html;
