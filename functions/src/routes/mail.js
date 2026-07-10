@@ -12,10 +12,28 @@ router.use(requireApiKey);
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // POST /mail/send  { to, templateKey, location, dynamicData }
-router.post('/send', asyncHandler(async (req, res, next) => {
-  const { to, templateKey, location, dynamicData } = req.body || {};
-  if (!to) {
-    return res.status(400).json({ ok: false, error: 'to_required' });
+router.post('/send', async (req, res, next) => {
+  try {
+    const { to, templateKey, location, dynamicData } = req.body || {};
+    if (!to) {
+      return res.status(400).json({ ok: false, error: 'to_required' });
+    }
+    if (typeof to !== 'string' || !emailRegex.test(to)) {
+      return res.status(400).json({ ok: false, error: 'invalid_email_format' });
+    }
+    if (!templateKey) {
+      return res.status(400).json({ ok: false, error: 'templateKey_required' });
+    }
+    const result = await mailService.dispatch({
+      to,
+      templateKey,
+      location,
+      dynamicData,
+      source: req.source
+    });
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    next(err);
   }
   if (!emailRegex.test(to)) {
     return res.status(400).json({ ok: false, error: 'invalid_email_format' });
