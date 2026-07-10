@@ -1,14 +1,15 @@
-const { requireApiKey } = require('./apiKeyAuth');
+const { requireAdmin } = require('./apiKeyAuth');
 
-describe('requireApiKey middleware', () => {
+describe('requireAdmin middleware', () => {
   let req;
   let res;
   let next;
+  const originalEnv = process.env;
 
   beforeEach(() => {
-    req = {
-      header: jest.fn(),
-    };
+    jest.resetModules();
+    process.env = { ...originalEnv };
+    req = {};
     res = {
       status: jest.fn().mockReturnThis(),
       json: jest.fn(),
