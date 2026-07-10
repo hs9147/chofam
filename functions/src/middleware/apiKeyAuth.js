@@ -1,3 +1,4 @@
+let cachedRawEnv = null;
 let cachedKeys = null;
 
 function parseKeys() {
