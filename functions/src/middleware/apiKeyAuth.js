@@ -1,10 +1,7 @@
 let cachedKeys = null;
+let cachedRawEnv = null;
 
 function parseKeys() {
-  if (cachedKeys !== null) {
-    return cachedKeys;
-  }
-
   const rawEnv = process.env.MAIL_API_KEYS;
 
   if (cachedRawEnv === rawEnv && cachedKeys !== null) {
@@ -77,4 +74,10 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-module.exports = { requireApiKey, requireAdmin };
+function _resetCache() {
+  cachedKeys = null;
+  cachedRawEnv = null;
+  cachedAdminSources = null;
+}
+
+module.exports = { requireApiKey, requireAdmin, parseKeys, _resetCache };
