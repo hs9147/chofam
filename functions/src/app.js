@@ -3,7 +3,25 @@ const cors = require('cors');
 const mailRouter = require('./routes/mail');
 
 const app = express();
-app.use(cors({ origin: true }));
+const allowedOrigins = [
+  'https://CHO-FAM.web.app',
+  'https://cho-fam.web.app',
+  'https://CHO-FAM.firebaseapp.com',
+  'https://cho-fam.firebaseapp.com',
+  'https://chofam-home.web.app',
+  'http://localhost:5000',
+  'http://127.0.0.1:5000'
+];
+
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      return callback(null, true);
+    }
+    return callback(new Error('Not allowed by CORS'));
+  }
+}));
 app.use(express.json());
 
 app.get(['/health', '/api/health'], (req, res) => res.json({ ok: true }));
