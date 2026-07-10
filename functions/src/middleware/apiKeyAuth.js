@@ -1,4 +1,10 @@
+let cachedKeys = null;
+
 function parseKeys() {
+  if (cachedKeys !== null) {
+    return cachedKeys;
+  }
+
   const rawEnv = process.env.MAIL_API_KEYS;
   if (!rawEnv) {
     console.warn('[AuthDebug] MAIL_API_KEYS environment variable is not defined or empty.');
@@ -23,7 +29,8 @@ function parseKeys() {
   console.log(`[AuthDebug] Loading MAIL_API_KEYS. Raw (Masked): ${maskedRaw}`);
 
   try {
-    return JSON.parse(rawEnv);
+    cachedKeys = JSON.parse(rawEnv);
+    return cachedKeys;
   } catch (err) {
     console.error('[AuthDebug] Failed to parse MAIL_API_KEYS JSON', err);
     return {};
