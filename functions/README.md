@@ -21,7 +21,7 @@
    ```bash
    firebase functions:secrets:set SENDGRID_API_KEY
    firebase functions:secrets:set MAIL_API_KEYS
-   # MAIL_API_KEYS 값 예시: {"<liv-ay-key>":"liv-ay","<admin-key>":"CHO-FAM-admin"}
+   # MAIL_API_KEYS 값 예시: {"<liv-ay-key>":"liv-ay","<admin-key>":"cho-fam-admin"}
    ```
 4. 로컬 개발 시 `functions/.env` 생성 (`.env.example` 참고, git에는 커밋되지 않음)
 5. 배포: `firebase deploy --only functions,firestore,hosting`
