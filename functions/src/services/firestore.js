@@ -8,4 +8,4 @@ const db = admin.firestore();
 const mailLogs = db.collection('mail_logs');
 const mailTemplates = db.collection('mail_templates');
 
-module.exports = { mailLogs, mailTemplates };
+module.exports = { db, mailLogs, mailTemplates };
