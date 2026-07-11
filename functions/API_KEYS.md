@@ -10,15 +10,15 @@
 
 ```bash
 openssl rand -hex 32
-# 예: 7f3a1c9e4b2d8f6a0c5e9b3d7f1a2c4e6b8d0f2a4c6e8b0d2f4a6c8e0b2d4f6a
+# 예: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
 서비스별로 구분이 쉽도록 접두사를 붙여 관리하는 것을 권장합니다 (접두사는 임의 표기일 뿐,
 실제 인증은 키 문자열 전체로 합니다):
 
 ```
-liv-ay     -> sk_liv_ay_7f3a1c9e4b2d8f6a0c5e9b3d7f1a2c4e
-cho-fam-admin -> sk_admin_2b6e0a4c8f1d5b9e3a7c1f5b9d3a7e1c
+liv-ay     -> sk_liv_ay_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+cho-fam-admin -> sk_admin_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
 ## 2. `MAIL_API_KEYS` 시크릿에 등록
@@ -32,7 +32,7 @@ firebase functions:secrets:set MAIL_API_KEYS
 프롬프트가 뜨면 아래와 같은 JSON 한 줄을 입력합니다 (이미 발급된 키는 유지하고 추가만 합니다):
 
 ```json
-{"sk_liv_ay_7f3a1c9e4b2d8f6a0c5e9b3d7f1a2c4e":"liv-ay","sk_admin_2b6e0a4c8f1d5b9e3a7c1f5b9d3a7e1c":"cho-fam-admin"}
+{"sk_liv_ay_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx":"liv-ay","sk_admin_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx":"cho-fam-admin"}
 ```
 
 - `source` 값(`liv-ay`, `cho-fam-admin` 등)은 `mail_logs`에 그대로 기록되어, 매니저
@@ -71,7 +71,7 @@ firebase emulators:start --only functions
 
 ```bash
 curl -X POST https://cho-fam.web.app/api/mail/send \
-  -H "x-api-key: sk_liv_ay_7f3a1c9e4b2d8f6a0c5e9b3d7f1a2c4e" \
+  -H "x-api-key: sk_liv_ay_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" \
   -H "Content-Type: application/json" \
   -d '{"to":"user@example.com","templateId":"d-xxxxxxxx","dynamicData":{"code":"123456"}}'
 ```
