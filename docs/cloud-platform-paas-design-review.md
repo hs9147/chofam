@@ -321,3 +321,16 @@ Gitea 선택 시: 배포 서버의 GitHub Webhook 처리(3.6절)는 Gitea 웹훅
   재사용하면 개발량을 추가로 줄일 수 있음.
 - 라이선스·비용: **전 스택을 무료·상용 무제한 라이선스로 구성 가능**(10절).
   소스 관리는 Gitea(MIT) self-host로 GitHub 대체, Redis 대신 Valkey 사용이 핵심 포인트.
+
+---
+
+## 12. 구현 현황
+
+컨트롤 플레인 초기 구현이 [`platform/`](../platform/README.md)에 있다.
+
+- 1차(small=Docker)·2차(enterprise=Kubernetes) 런타임 모두 구현 — `PAAS_TIER` 설정으로 전환,
+  `Runtime` 인터페이스 교체 구조(6.3절 규칙 2 적용)
+- 빌드 옵션 **development / release** 구분: 이미지 태그(-dev), dev 서버 vs 프로덕션 빌드,
+  리소스 50%/100%, replicas 1/2, 도메인 {name}-dev.* / {name}.*, 동시 기동 지원
+- 무중단 배포(1차: 블루-그린+헬스체크+Caddy 전환, 2차: RollingUpdate), 롤백(이미지 태그 재기동),
+  웹훅 HMAC 검증(GitHub/Gitea), EnvVar Fernet 암호화, API 키 인증, 감사 로그 포함
