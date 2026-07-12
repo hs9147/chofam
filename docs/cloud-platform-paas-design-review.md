@@ -324,7 +324,88 @@ Gitea 선택 시: 배포 서버의 GitHub Webhook 처리(3.6절)는 Gitea 웹훅
 
 ---
 
-## 12. 구현 현황
+## 12. 코드 워크스페이스 — LLM 대화식 코드 작성·리뷰·실행 미리보기
+
+배포 플랫폼 위에 "코드를 만지는" 레이어를 얹는다. 세 기능은 별개가 아니라 하나의 루프다:
+
+```
+대화(LLM) → 코드 편집/리뷰(diff) → 실행 미리보기 → 다시 대화
+```
+
+### 12.1 대화식 코드 작성·편집 (외부/내부 LLM)
+
+- **프로바이더 추상화 — OpenAI 호환으로 통일.** 외부(Claude API, OpenAI 등)와
+  내부(플랫폼에 llm 타입으로 배포된 vLLM/Ollama)를 같은 인터페이스로 등록하고 대화 시 선택한다.
+  내부 LLM 옵션이 있으므로 **소스 코드가 회사 밖으로 나가지 않는 모드**가 가능 — 기업 내부 사용의
+  핵심 요구이자 이 플랫폼의 차별점(1절의 LLM 레이어 전략과 합치).
+- 외부 프로바이더의 API 키는 기존 EnvVar와 동일하게 **Fernet 암호화 저장**, 응답에서는 마스킹.
+- 채팅 세션은 프로젝트 워크스페이스(checkout된 리포)에 바인딩된다. 파일 트리·선택 파일을
+  컨텍스트로 주입하고, LLM의 수정 제안은 **항상 diff(patch)로 생성** → 웹 UI diff 뷰에서
+  검토 → 승인 시에만 작업 브랜치에 커밋. LLM이 리포에 직접 쓰는 일은 없다.
+- **자동 코드 리뷰**: push/배포 전 diff를 LLM에 전달해 리뷰 코멘트(버그·보안·스타일, 심각도 분류)를
+  생성. 초기엔 참고용, 이후 "심각도 high 발견 시 release 배포 차단" 같은 게이트를 선택 적용.
+- **모델 라우팅 정책**: 프로젝트/조직 단위로 "이 프로젝트는 내부 LLM만 허용" 규칙을 설정
+  (2차 대기업 요구인 데이터 거버넌스에 대응).
+
+### 12.2 외부/내부 API·파일·DB 모듈화 및 환경설정
+
+코드가 의존하는 자원(API·파일 저장소·DB)을 **Module로 등록하고 프로젝트에 바인딩**하면
+환경설정이 자동 주입되는 구조. 코드에서 자격증명이 사라지고, LLM 코드 생성의 재료가 된다.
+
+| Module 타입 | 예 | 바인딩 시 주입되는 환경변수(규약) |
+| --- | --- | --- |
+| external_api | 결제 API, CHO-FAM 메일 API | `{PREFIX}_URL`, `{PREFIX}_API_KEY` |
+| internal_api | 플랫폼에 배포된 다른 프로젝트 | `{PREFIX}_URL` — 1차: Caddy 도메인, 2차: K8s Service DNS로 자동 해석 |
+| database | PostgreSQL, SQLite | `{PREFIX}_DSN` |
+| file_storage | 로컬 볼륨, SeaweedFS | `{PREFIX}_BUCKET`, `{PREFIX}_ENDPOINT` |
+
+- 자격증명은 전부 기존 EnvVar 암호화 경로 재사용 — 새 보안 표면을 만들지 않는다.
+- internal_api 모듈은 **서비스 디스커버리를 겸한다**: 프로젝트 간 호출을 도메인 하드코딩 없이
+  모듈 참조로 연결하면 1차→2차 전환 시 주소 체계가 바뀌어도 코드 수정이 없다(6.3절 규칙 4와 합치).
+- **LLM 연계가 모듈화의 실익**: 채팅 컨텍스트에 바인딩된 모듈 목록·스키마를 제공하면
+  "등록된 결제 모듈로 결제 연동 코드 짜줘"가 환경변수 규약에 맞는 코드로 바로 생성된다.
+
+### 12.3 실행 결과 미리보기
+
+- **1단계 (이미 확보)**: development 프로필 배포가 곧 미리보기다 —
+  `{name}-dev.{base_domain}`에서 운영과 격리된 실행 결과를 확인(13절 구현 완료).
+- **2단계 — 편집 세션별 임시 프리뷰(PreviewSession)**: 채팅에서 diff를 적용한 작업 브랜치를
+  development 프로필로 빌드해 **TTL이 있는 임시 유닛**(`{name}-pv{n}.{base_domain}`)으로 기동.
+  웹 UI에서 iframe 미리보기 + 실행 로그 패널을 나란히 보여주고, TTL 만료·세션 종료 시 자동 회수.
+  Netlify의 Deploy Preview 개념을 development 프로필 재사용으로 구현하는 것.
+- react(정적)는 빌드 산출물 디렉토리 서빙이라 프리뷰가 수 초 내로 뜨고,
+  python/node는 dev 컨테이너(HMR/--reload)라 편집 반영이 즉각적이다.
+- **안전장치(필수)**: 프리뷰 유닛은 리소스 상한 축소(dev 프로필의 50%), 외부 네트워크 차단
+  (바인딩된 Module만 허용), TTL 기본 1시간, 동시 프리뷰 수 제한. LLM이 생성한 코드가
+  실행되는 지점이므로 7절 체크리스트 중 컨테이너 격리 항목이 여기서 가장 중요해진다.
+
+### 12.4 데이터 모델·API 확장 초안
+
+```
+LlmProvider(id, name, kind: external|internal, base_url, api_key_encrypted, model, allowed_scope)
+ChatSession(id, project_id, provider_id, branch, created_at)
+ProposedChange(id, session_id, diff, status: proposed|applied|rejected, applied_sha)
+Module(id, name, type, config_json)            ModuleBinding(project_id, module_id, env_prefix)
+PreviewSession(id, project_id, branch, url, expires_at, status)
+```
+
+```
+POST /llm/providers                POST /chat/sessions
+POST /chat/sessions/{id}/messages  POST /changes/{id}/apply | /reject
+POST /projects/{id}/review         # diff 리뷰 요청
+POST /modules  GET /modules        POST /projects/{id}/modules/{mid}/bind
+POST /projects/{id}/preview        DELETE /previews/{id}
+```
+
+### 12.5 로드맵 편입
+
+8절 로드맵 기준: Module 레지스트리와 dev 프리뷰 활용은 **Phase 2**에, LLM 프로바이더
+추상화·대화식 편집·자동 리뷰는 **Phase 3**(LLM 플랫폼 구간)에, 임시 PreviewSession과
+모델 라우팅 정책·리뷰 게이트는 **Phase 4**에 편입한다.
+
+---
+
+## 13. 구현 현황
 
 컨트롤 플레인 초기 구현이 [`platform/`](../platform/README.md)에 있다.
 
