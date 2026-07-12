@@ -32,8 +32,8 @@
 | 선택지 | 장점 | 단점 | 적합한 경우 |
 | --- | --- | --- | --- |
 | **자체 개발 (제안안)** | liv-ay/LLM 요구에 정확히 맞춤, 학습 효과 | 개발·유지보수 비용 최대, 보안 책임 전부 부담 | LLM 관리가 핵심이고 장기 운영 의지가 있을 때 |
-| **Coolify** | Git push 배포, SSL, 도메인, 로그, 웹훅 전부 내장. 가장 활발한 커뮤니티 | LLM/GPU 관리 기능 없음, 커스터마이징 한계 | 웹앱 배포가 주 목적일 때 |
-| **Dokploy** | Docker Compose 친화, Traefik 내장, 가벼움 | 위와 동일 | 위와 동일 |
+| **Coolify** | Git push 배포, SSL, 도메인, 로그, 웹훅 전부 내장. 가장 활발한 커뮤니티. **Apache 2.0 완전 오픈소스** | LLM/GPU 관리 기능 없음, 커스터마이징 한계 | 웹앱 배포가 주 목적일 때 |
+| **Dokploy** | Docker Compose 친화, Traefik 내장, 가벼움 | ⚠️ 코어는 Apache 2.0이지만 일부(`/proprietary`, 템플릿·멀티노드)가 source-available — 상용 재배포 제약. 수익 플랫폼 기반으로는 비추천 (10절 참고) | 내부 전용일 때만 |
 | **하이브리드 (권장)** | 웹앱은 Coolify/Dokploy에 맡기고, **LLM 관리 플랫폼만 자체 개발** | 두 시스템 운영 | 개발 리소스가 제한적이고 LLM이 차별점일 때 |
 
 전부 직접 만드는 경험 자체가 목표라면 자체 개발도 좋은 선택입니다. 그 경우 아래 3~7절의
@@ -194,7 +194,63 @@ created_at
 
 ---
 
-## 9. 결론
+## 9. 오픈소스 라이선스·비용 검토 (사내·수익 활동 기준)
+
+> 기준: 자체 서버에 self-host, 기업 내부 및 수익 활동 사용, 소프트웨어 비용 0원, 상용 제약 없는 라이선스.
+> 결론부터: **전 구간을 이 기준으로 구성 가능**합니다. 비용은 서버·도메인·트래픽뿐입니다.
+
+### 9.1 라이선스 판단 기준 (3줄 요약)
+
+| 라이선스 계열 | 상용/사내 self-host | 비고 |
+| --- | --- | --- |
+| MIT / Apache 2.0 / BSD | ✅ 무제한 안전 | 수정·재판매·비공개 포크 전부 가능 |
+| GPL / AGPL | ✅ 내부 사용·수익 활동 안전 | **수정본을 배포하거나(GPL) 외부에 네트워크 서비스로 제공(AGPL)할 때만** 소스 공개 의무. 도구를 "쓰는" 것만으로는 의무 없음 |
+| SSPL / BSL / RSAL / fair-source | ⚠️ 회피 권장 | "오픈소스처럼 보이는" 상용 제약 라이선스. 대체재가 있으면 쓰지 말 것 |
+
+### 9.2 소스 관리 — GitHub 대체 (self-host Git 서버)
+
+| 후보 | 라이선스 | 평가 |
+| --- | --- | --- |
+| **Gitea (권장)** | MIT | 경량(RAM 수백 MB), GitHub 스타일 UI, 웹훅·REST API, **Gitea Actions(GitHub Actions 호환 CI) 내장**. 우리 Auto Deploy 웹훅 설계를 그대로 연결 가능 |
+| Forgejo | GPL-3.0 | Gitea의 커뮤니티 포크(Codeberg e.V. 비영리 거버넌스). 기능 동등 이상, 보안 패치 공개가 더 투명. GPL이지만 self-host 사용엔 제약 없음 |
+| GitLab CE | MIT | 기능 최다이나 무겁다(권장 RAM 4GB+). 단일 서버에 앱들과 동거시키기엔 부담 |
+| Gogs | MIT | 가장 가볍지만 개발 활동 저조 — 비추천 |
+
+Gitea 선택 시: 배포 서버의 GitHub Webhook 처리(3.6절)는 Gitea 웹훅과 페이로드 형식이 거의 동일해
+(HMAC 서명 헤더만 `X-Gitea-Signature`) 코드 수정이 최소화됩니다.
+
+### 9.3 스택 전체 라이선스 표
+
+| 구성 요소 | 도구 | 라이선스 | 판정 |
+| --- | --- | --- | --- |
+| Backend | FastAPI | MIT | ✅ |
+| Frontend | React, Vite | MIT | ✅ |
+| DB | SQLite → PostgreSQL | Public Domain / PostgreSQL(BSD계) | ✅ |
+| 컨테이너 | **Docker Engine** (Linux) | Apache 2.0 | ✅ ⚠️ **Docker Desktop은 기업 유료** — 서버는 Engine만 쓰므로 무관하나 개발 PC에서 주의 |
+| Proxy + SSL | Caddy | Apache 2.0 | ✅ |
+| 인증서 | Let's Encrypt | 무료 CA (상용 OK) | ✅ |
+| Cache/Queue | ~~Redis~~ → **Valkey** | BSD-3 | ✅ Redis는 2024년 SSPL 전환 → 2025년 Redis 8부터 AGPLv3 복귀로 혼란. Linux Foundation 포크인 Valkey(BSD-3, 드롭인 호환)가 상용 기준 가장 깔끔 |
+| 작업 큐 | arq (Valkey 사용) | MIT | ✅ |
+| 모니터링 수집 | psutil, nvidia-ml-py, Prometheus | BSD / Apache 2.0 | ✅ |
+| 대시보드 | 자체 React 대시보드 권장 | — | Grafana는 AGPLv3 — 내부 사용은 문제없으나, 회피하려면 자체 구현 또는 VictoriaMetrics(Apache 2.0) 계열 |
+| Git 서버 | Gitea | MIT | ✅ |
+| CI | Gitea Actions 또는 Woodpecker CI | MIT / Apache 2.0 | ✅ Drone CI는 BSL 전환 — 회피 |
+| LLM 서빙 | vLLM / Ollama | Apache 2.0 / MIT | ✅ |
+| 오브젝트 스토리지 | (필요 시) SeaweedFS | Apache 2.0 | MinIO는 AGPL + 2025년 커뮤니티판 관리 UI 축소 — 회피. 초기엔 로컬 파일시스템으로 충분 |
+| 기성 PaaS(하이브리드안) | Coolify | Apache 2.0 | ✅ / Dokploy는 일부 source-available — 회피 |
+
+### 9.4 요주의 목록 정리
+
+- **Redis** → Valkey로 대체 (드롭인 호환, 코드 수정 불필요)
+- **Dokploy** → 수익 플랫폼 기반으로는 부적합, Coolify 사용
+- **MinIO** → SeaweedFS 또는 파일시스템
+- **Drone CI** → Woodpecker CI 또는 Gitea Actions
+- **Docker Desktop** → 서버는 Docker Engine(무료), 맥/윈도 개발 PC는 기업 규모에 따라 유료일 수 있음 (대안: OrbStack 유료, Colima 무료)
+- **Grafana/Loki (AGPL)** → 내부 사용은 합법·무료지만, 플랫폼 기능으로 외부 제공·수정 배포 계획이 있으면 자체 대시보드로
+
+---
+
+## 10. 결론
 
 - 설계 방향은 타당하며, 구성 요소 목록도 빠짐없음.
 - **Docker 고정 + Caddy 채택 + 초기 스택 축소(SQLite, 큐 생략)** 세 가지만 반영하면
@@ -203,3 +259,5 @@ created_at
   오픈소스로 대체하는 하이브리드안도 병행 검토 권장.
 - 기존 CHO-FAM 자산(메일 API, x-api-key 인증 패턴, admin 대시보드 UI)을 알림·인증·프론트엔드에
   재사용하면 개발량을 추가로 줄일 수 있음.
+- 라이선스·비용: **전 스택을 무료·상용 무제한 라이선스로 구성 가능**(9절).
+  소스 관리는 Gitea(MIT) self-host로 GitHub 대체, Redis 대신 Valkey 사용이 핵심 포인트.
