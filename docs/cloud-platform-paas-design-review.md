@@ -142,7 +142,66 @@ created_at
 
 ---
 
-## 6. 보안 체크리스트 (자체 개발 시 반드시)
+## 6. 규모별 기술 스택 정의 — 1차 중소규모 / 2차 대기업 규모
+
+> 원칙: 1차 → 2차는 **"교체"가 아니라 "위임 대상 확대"**입니다.
+> 컨트롤 플레인(FastAPI API + React 대시보드 + PostgreSQL + Gitea)은 두 단계에서 동일하게 유지하고,
+> 실행 계층만 "Docker 단일/소수 서버" → "Kubernetes 클러스터"로 바꿉니다.
+> 전 항목이 10절의 라이선스 기준(무료·상용 무제한)을 충족합니다.
+
+### 6.1 1차 — 중소규모
+
+목표 규모: 서버 1~3대, 프로젝트 ~50개, 사용자 ~수십 명, GPU 1~2대. 운영 인력 1~2명.
+
+| 영역 | 선택 | 근거 |
+| --- | --- | --- |
+| 컨트롤 플레인 | FastAPI + SQLAlchemy | 2차에서도 그대로 유지되는 자산 |
+| DB | SQLite → PostgreSQL 16 | 프로젝트 10개/동시 사용자 5명 넘으면 PostgreSQL 전환 |
+| 캐시·큐 | Valkey + arq | 큐가 필요해지는 시점(웹훅 폭주)까지는 BackgroundTasks로 버팀 |
+| 런타임 | Docker Engine | restart policy·리소스 제한·로그 포함 |
+| 프록시·SSL | Caddy | 도메인·인증서 자동화 일체 |
+| 소스 관리·CI | Gitea + Gitea Actions | GitHub 대체 + CI 내장 (10.2절) |
+| 모니터링 | psutil + nvidia-ml-py + Prometheus | 수집만 표준화, 저장은 SQLite 링버퍼 |
+| 대시보드 | 자체 React 대시보드 | admin 대시보드 경험 재활용 |
+| 로그 | Docker json-file(rotation) + WebSocket | 3.4절 |
+| 인증 | API 키(해시) + 관리자 세션 | CHO-FAM x-api-key 패턴 재사용 |
+| 시크릿 | DB 암호화 컬럼(Fernet) | 키는 서버 환경변수로만 |
+| 스토리지 | 로컬 파일시스템 | 정적 배포 산출물·빌드 로그 |
+| LLM | vLLM / Ollama 직결 | 단일 GPU 서버, 게이트웨이는 FastAPI가 겸함 |
+
+### 6.2 2차 — 대기업 규모
+
+요구 변화: 무중단 HA, 수백 프로젝트·수백 사용자, 팀/권한(RBAC), SSO(AD·LDAP), 감사 로그,
+테넌트 격리, 이미지 취약점 스캔, 장기 메트릭 보관.
+
+| 영역 | 선택 | 라이선스 | 근거 |
+| --- | --- | --- | --- |
+| 오케스트레이션 | Kubernetes (K3s부터 가능) | Apache 2.0 | 스케줄링·오토스케일·롤링배포·자가치유를 직접 구현하지 않고 위임. 플랫폼의 Runtime Manager는 "K8s 매니페스트 생성기"로 역할 전환 |
+| Ingress·SSL | Traefik 또는 ingress-nginx + cert-manager | MIT / Apache 2.0 | Caddy 역할의 클러스터 버전 |
+| DB | PostgreSQL HA (CloudNativePG 또는 Patroni) + PgBouncer | Apache 2.0 / PostgreSQL | 컨트롤 플레인 DB 무중단화 |
+| 큐·이벤트 | Valkey Cluster + NATS JetStream | BSD-3 / Apache 2.0 | 배포 이벤트·웹훅 팬아웃 |
+| 이미지 레지스트리 | Harbor (+Trivy 스캔) | Apache 2.0 | 프라이빗 레지스트리 + 취약점 스캔 + 프로젝트별 RBAC |
+| SSO·IAM | Keycloak | Apache 2.0 | OIDC/SAML, AD·LDAP 연동. Gitea·대시보드·API 전부 OIDC로 통합 — Git 서버 SSO를 유료판 없이 해결 |
+| 시크릿 | OpenBao | MPL 2.0 | ⚠️ HashiCorp Vault는 BSL 전환 — Linux Foundation 포크인 OpenBao 사용 |
+| IaC | OpenTofu + Ansible | MPL 2.0 / GPL | ⚠️ Terraform도 BSL — OpenTofu 사용 |
+| 관측성 | Prometheus + VictoriaMetrics(장기 보관) + OpenTelemetry, 로그 VictoriaLogs 또는 OpenSearch | Apache 2.0 | Grafana/Loki(AGPL) 없이 구성 가능 (10절 기준) |
+| 스토리지 | SeaweedFS 또는 Rook-Ceph | Apache 2.0 | 산출물·모델 파일 분산 저장 |
+| GPU | NVIDIA GPU Operator + device plugin | Apache 2.0 | GPU 노드풀 스케줄링, MIG 분할 |
+| LLM 게이트웨이 | 자체 게이트웨이 유지 또는 LiteLLM(코어 MIT) | MIT | API 키·rate limit·사용량 집계는 Phase 3 자산 그대로 |
+| 소스 관리 | Gitea/Forgejo HA + Keycloak OIDC | MIT / GPL-3.0 | 1차 자산 유지, SSO만 추가 |
+
+### 6.3 1차에서 지키면 2차 전환이 싸지는 설계 규칙
+
+1. **배포 단위를 이미지 태그로 고정** (3.1절) — K8s 전환 시 Deployment 매니페스트에 태그만 꽂으면 됨
+2. **Runtime Manager를 인터페이스로 추상화** — `DockerRuntime` 구현체를 `K8sRuntime`으로 교체하는 구조
+3. **SQLAlchemy 사용** — SQLite→PostgreSQL→HA 전환 무비용
+4. **배포되는 앱에 12-factor 강제** — 설정은 환경변수, 로그는 stdout, 로컬 상태 금지
+5. **인증을 미들웨어 한 곳에 집중** — API 키 → Keycloak OIDC 교체 지점을 단일화
+6. **감사 대상 행위(배포·롤백·시크릿 변경·키 발급)를 1차부터 이벤트 테이블에 기록** — 2차의 감사 로그 요구는 스키마가 아니라 UI 문제가 되도록
+
+---
+
+## 7. 보안 체크리스트 (자체 개발 시 반드시)
 
 1. GitHub Webhook HMAC 서명 검증 (3.6절)
 2. 환경변수/시크릿 암호화 저장, API 응답에서 값 마스킹
@@ -155,7 +214,7 @@ created_at
 
 ---
 
-## 7. 단계별 로드맵
+## 8. 단계별 로드맵
 
 ### Phase 1 — MVP (핵심 루프 검증)
 - Project CRUD + git clone/pull
@@ -179,27 +238,28 @@ created_at
 - GPU/VRAM 대시보드 (NVML)
 
 ### Phase 4 — 확장 (필요해질 때만)
-- PostgreSQL/Redis/arq 전환, 멀티 서버, 오토스케일링, 이미지 생성 서버(Flux 등) 등록
+- 2차(대기업 규모) 스택으로 전환 — Kubernetes·Harbor·Keycloak·OpenBao 등 6.2절 참고
+- 이미지 생성 서버(Flux 등) 등록
 
 ---
 
-## 8. 리스크
+## 9. 리스크
 
 | 리스크 | 내용 | 완화 |
 | --- | --- | --- |
 | 유지보수 부담 | 배포 서버 자체가 SPOF. 배포 서버가 죽으면 모든 앱 배포 불가 | 앱 런타임(Docker+Caddy)은 배포 서버 프로세스와 독립적으로 동작하도록 설계 — 배포 서버가 죽어도 서비스는 계속 뜸 |
-| 보안 사고 | 웹훅/시크릿/도커 소켓 취급 실수 시 서버 전체 장악 가능 | 6절 체크리스트를 Phase 1부터 적용 |
+| 보안 사고 | 웹훅/시크릿/도커 소켓 취급 실수 시 서버 전체 장악 가능 | 7절 체크리스트를 Phase 1부터 적용 |
 | 범위 팽창 | 10개 컴포넌트 동시 개발 시 완성 전에 동력 상실 | Phase 1을 2주 내 완결 가능한 크기로 고정 |
 | 오픈소스와의 중복 | Phase 1~2는 Coolify가 이미 제공 | LLM 요구가 확실치 않으면 2절 하이브리드안 재검토 |
 
 ---
 
-## 9. 오픈소스 라이선스·비용 검토 (사내·수익 활동 기준)
+## 10. 오픈소스 라이선스·비용 검토 (사내·수익 활동 기준)
 
 > 기준: 자체 서버에 self-host, 기업 내부 및 수익 활동 사용, 소프트웨어 비용 0원, 상용 제약 없는 라이선스.
 > 결론부터: **전 구간을 이 기준으로 구성 가능**합니다. 비용은 서버·도메인·트래픽뿐입니다.
 
-### 9.1 라이선스 판단 기준 (3줄 요약)
+### 10.1 라이선스 판단 기준 (3줄 요약)
 
 | 라이선스 계열 | 상용/사내 self-host | 비고 |
 | --- | --- | --- |
@@ -207,7 +267,7 @@ created_at
 | GPL / AGPL | ✅ 내부 사용·수익 활동 안전 | **수정본을 배포하거나(GPL) 외부에 네트워크 서비스로 제공(AGPL)할 때만** 소스 공개 의무. 도구를 "쓰는" 것만으로는 의무 없음 |
 | SSPL / BSL / RSAL / fair-source | ⚠️ 회피 권장 | "오픈소스처럼 보이는" 상용 제약 라이선스. 대체재가 있으면 쓰지 말 것 |
 
-### 9.2 소스 관리 — GitHub 대체 (self-host Git 서버)
+### 10.2 소스 관리 — GitHub 대체 (self-host Git 서버)
 
 | 후보 | 라이선스 | 평가 |
 | --- | --- | --- |
@@ -219,7 +279,7 @@ created_at
 Gitea 선택 시: 배포 서버의 GitHub Webhook 처리(3.6절)는 Gitea 웹훅과 페이로드 형식이 거의 동일해
 (HMAC 서명 헤더만 `X-Gitea-Signature`) 코드 수정이 최소화됩니다.
 
-### 9.3 스택 전체 라이선스 표
+### 10.3 스택 전체 라이선스 표
 
 | 구성 요소 | 도구 | 라이선스 | 판정 |
 | --- | --- | --- | --- |
@@ -239,7 +299,7 @@ Gitea 선택 시: 배포 서버의 GitHub Webhook 처리(3.6절)는 Gitea 웹훅
 | 오브젝트 스토리지 | (필요 시) SeaweedFS | Apache 2.0 | MinIO는 AGPL + 2025년 커뮤니티판 관리 UI 축소 — 회피. 초기엔 로컬 파일시스템으로 충분 |
 | 기성 PaaS(하이브리드안) | Coolify | Apache 2.0 | ✅ / Dokploy는 일부 source-available — 회피 |
 
-### 9.4 요주의 목록 정리
+### 10.4 요주의 목록 정리
 
 - **Redis** → Valkey로 대체 (드롭인 호환, 코드 수정 불필요)
 - **Dokploy** → 수익 플랫폼 기반으로는 부적합, Coolify 사용
@@ -250,7 +310,7 @@ Gitea 선택 시: 배포 서버의 GitHub Webhook 처리(3.6절)는 Gitea 웹훅
 
 ---
 
-## 10. 결론
+## 11. 결론
 
 - 설계 방향은 타당하며, 구성 요소 목록도 빠짐없음.
 - **Docker 고정 + Caddy 채택 + 초기 스택 축소(SQLite, 큐 생략)** 세 가지만 반영하면
@@ -259,5 +319,5 @@ Gitea 선택 시: 배포 서버의 GitHub Webhook 처리(3.6절)는 Gitea 웹훅
   오픈소스로 대체하는 하이브리드안도 병행 검토 권장.
 - 기존 CHO-FAM 자산(메일 API, x-api-key 인증 패턴, admin 대시보드 UI)을 알림·인증·프론트엔드에
   재사용하면 개발량을 추가로 줄일 수 있음.
-- 라이선스·비용: **전 스택을 무료·상용 무제한 라이선스로 구성 가능**(9절).
+- 라이선스·비용: **전 스택을 무료·상용 무제한 라이선스로 구성 가능**(10절).
   소스 관리는 Gitea(MIT) self-host로 GitHub 대체, Redis 대신 Valkey 사용이 핵심 포인트.
