@@ -415,3 +415,7 @@ POST /projects/{id}/preview        DELETE /previews/{id}
   리소스 50%/100%, replicas 1/2, 도메인 {name}-dev.* / {name}.*, 동시 기동 지원
 - 무중단 배포(1차: 블루-그린+헬스체크+Caddy 전환, 2차: RollingUpdate), 롤백(이미지 태그 재기동),
   웹훅 HMAC 검증(GitHub/Gitea), EnvVar Fernet 암호화, API 키 인증, 감사 로그 포함
+- **12절 코드 워크스페이스 구현 완료**: LLM 프로바이더 추상화(외부 + `project://` 내부 해석),
+  대화식 편집(diff 제안 → 승인 시에만 커밋), 코드 리뷰(심각도 분류), Module 레지스트리
+  4타입(민감 config 암호화·티어별 internal_api URL 해석·배포 시 자동 주입),
+  TTL PreviewSession(CPU 50%·GPU 금지·동시 5개 제한·lazy 회수)

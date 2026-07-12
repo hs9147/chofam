@@ -93,10 +93,37 @@ curl -X POST $BASE/projects/1/deploy -H "x-api-key: $ADMIN" \
 curl -X POST "$BASE/projects/1/rollback?profile=release" -H "x-api-key: $ADMIN"
 ```
 
+## 코드 워크스페이스 (설계 문서 12절)
+
+```
+POST /llm/providers                     # 외부(Claude/OpenAI) 또는 내부(project://<llm 프로젝트>) 등록 (admin)
+GET  /llm/providers                     # api_key는 has_api_key로만 노출
+POST /chat/sessions                     # {project_id, provider_id, branch?} — 기본 브랜치 paas/chat-{id}
+POST /chat/sessions/{id}/messages       # 파일 트리·모듈 규약·요청 파일을 컨텍스트로 LLM 호출
+                                        # 응답에 diff가 있으면 ProposedChange 자동 생성
+POST /changes/{id}/apply                # 승인 → 작업 브랜치에 git apply + commit (LLM 직접 쓰기 없음)
+POST /changes/{id}/reject
+POST /projects/{id}/review              # {provider_id, diff? , base_ref?} → 심각도 분류 findings
+
+POST /modules                           # external_api | internal_api | database | file_storage
+                                        # config의 api_key/dsn/secret 등은 Fernet 암호화 저장
+POST /projects/{id}/modules/{mid}/bind  # {env_prefix: "PAY"} → 배포 시 PAY_URL 등 자동 주입
+GET  /projects/{id}/modules             # LLM 컨텍스트용 요약 (비밀값 제외)
+
+POST /projects/{id}/preview             # {branch?, ttl_minutes=60} → {name}-pv{n}.{base_domain}
+GET  /projects/{id}/previews            # 조회 시 만료 프리뷰 자동 회수
+DELETE /previews/{id}
+```
+
+- 내부 LLM 프로바이더(`project://llm-main`)를 쓰면 소스가 사내망을 벗어나지 않습니다.
+- internal_api 모듈의 URL은 티어에 따라 자동 해석됩니다
+  (small: `https://{target}.{base_domain}`, enterprise: `http://paas-{target}.{ns}.svc`).
+- 프리뷰는 development 프로필 빌드를 재사용하되 CPU 50%·GPU 금지·동시 5개 제한·TTL 회수가 걸립니다.
+
 ## 테스트
 
 ```bash
-cd platform && python -m pytest tests/ -q   # 21 passed
+cd platform && python -m pytest tests/ -q   # 39 passed
 ```
 
 Docker/K8s 미설치 환경에서도 컨트롤 플레인·매니페스트 생성·프로필 로직이 검증됩니다.

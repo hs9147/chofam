@@ -2,7 +2,7 @@ import secrets
 
 from fastapi import FastAPI
 
-from .api import projects, system, webhooks
+from .api import llm, modules, previews, projects, system, webhooks
 from .config import get_settings
 from .db import Base, engine
 
@@ -28,6 +28,9 @@ def create_app() -> FastAPI:
     app.include_router(system.router)
     app.include_router(projects.router)
     app.include_router(webhooks.router)
+    app.include_router(llm.router)
+    app.include_router(modules.router)
+    app.include_router(previews.router)
     return app
 
 
