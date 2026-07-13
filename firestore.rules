@@ -7,5 +7,10 @@ service cloud.firestore {
     match /mail_logs/{logId} {
       allow read, write: if false;
     }
+
+    // payout_logs (토스 지급대행 감사 로그) — 동일하게 Admin SDK 전용.
+    match /payout_logs/{logId} {
+      allow read, write: if false;
+    }
   }
 }

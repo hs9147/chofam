@@ -7,5 +7,6 @@ if (!admin.apps.length) {
 const db = admin.firestore();
 const mailLogs = db.collection('mail_logs');
 const mailTemplates = db.collection('mail_templates');
+const payoutLogs = db.collection('payout_logs');
 
-module.exports = { db, mailLogs, mailTemplates };
+module.exports = { db, mailLogs, mailTemplates, payoutLogs };
