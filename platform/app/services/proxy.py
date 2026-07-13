@@ -34,7 +34,8 @@ def configure(project_name: str, profile: BuildProfile, domain: str, endpoint: E
     suffix = "-dev" if profile == BuildProfile.development else ""
     site_file = settings.caddy_sites_dir / f"{project_name}{suffix}.caddy"
     site_file.write_text(
-        SITE_TEMPLATE.format(domain=domain, host=endpoint.host, port=endpoint.port)
+        SITE_TEMPLATE.format(domain=domain, host=endpoint.host, port=endpoint.port),
+        encoding="utf-8",
     )
     reload_caddy()
 

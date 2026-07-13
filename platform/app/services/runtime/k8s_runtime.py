@@ -210,7 +210,10 @@ class K8sRuntime(Runtime):
 
     def _write_manifests(self, spec: RuntimeSpec, manifests: list[dict]) -> Path:
         out = get_settings().k8s_manifest_dir / f"{spec.unit_name}.yaml"
-        out.write_text(yaml.safe_dump_all(manifests, sort_keys=False, allow_unicode=True))
+        out.write_text(
+            yaml.safe_dump_all(manifests, sort_keys=False, allow_unicode=True),
+            encoding="utf-8",
+        )
         return out
 
     @staticmethod

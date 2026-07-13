@@ -14,7 +14,7 @@ def test_boots_without_dist(monkeypatch, tmp_path):
 def test_serves_console_when_dist_exists(monkeypatch, tmp_path):
     dist = tmp_path / "dist"
     dist.mkdir()
-    (dist / "index.html").write_text("<!doctype html><title>PaaS 콘솔</title>")
+    (dist / "index.html").write_text("<!doctype html><title>PaaS 콘솔</title>", encoding="utf-8")
     monkeypatch.setenv("PAAS_CONSOLE_DIST", str(dist))
     c = TestClient(create_app())
     assert c.get("/health").status_code == 200

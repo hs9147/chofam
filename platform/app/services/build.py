@@ -103,7 +103,7 @@ def build_image(project: Project, workdir: Path, git_sha: str, profile: BuildPro
         "--build-arg", f"APP_PROFILE={profile.value}",
         str(workdir),
     ]
-    with open(log_path, "w") as log:
+    with open(log_path, "w", encoding="utf-8") as log:
         log.write(f"$ {' '.join(cmd)}\n")
         log.flush()
         proc = subprocess.run(cmd, stdout=log, stderr=subprocess.STDOUT)

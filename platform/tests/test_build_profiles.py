@@ -42,9 +42,9 @@ def test_react_release_serves_static_port_80():
 
 
 def test_dev_templates_run_dev_servers():
-    react_dev = (TEMPLATE_DIR / "react.development.Dockerfile").read_text()
-    python_dev = (TEMPLATE_DIR / "python.development.Dockerfile").read_text()
-    python_rel = (TEMPLATE_DIR / "python.release.Dockerfile").read_text()
+    react_dev = (TEMPLATE_DIR / "react.development.Dockerfile").read_text(encoding="utf-8")
+    python_dev = (TEMPLATE_DIR / "python.development.Dockerfile").read_text(encoding="utf-8")
+    python_rel = (TEMPLATE_DIR / "python.release.Dockerfile").read_text(encoding="utf-8")
     assert "npm" in react_dev and "dev" in react_dev
     assert "--reload" in python_dev
     assert "--workers" in python_rel and "--reload" not in python_rel
