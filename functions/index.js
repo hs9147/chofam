@@ -4,7 +4,7 @@ const app = require('./src/app');
 exports.api = onRequest(
   {
     region: 'us-central1',
-    secrets: ['SENDGRID_API_KEY', 'MAIL_API_KEYS', 'TOSS_SECRET_KEY', 'TOSS_SECURITY_KEY'],
+    secrets: ['SMTP_HOST', 'SMTP_USER', 'SMTP_PASS', 'MAIL_API_KEYS', 'TOSS_SECRET_KEY', 'TOSS_SECURITY_KEY'],
     invoker: 'public',
   },
   app

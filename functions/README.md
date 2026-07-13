@@ -15,13 +15,16 @@
 
 ## 설정
 
-1. SendGrid에서 발신 도메인 인증(SPF/DKIM) 및 동적 템플릿 생성
+1. SMTP 릴레이 준비(AWS SES, SMTP2GO, Brevo 등) 및 릴레이에서 발신 도메인 인증(SPF/DKIM)
 2. 서비스별 API 키 발급 (예: liv-ay 게임서버용, 매니저 웹페이지 admin용) — 자세한 절차는 [API_KEYS.md](./API_KEYS.md) 참고
 3. 시크릿 등록:
    ```bash
-   firebase functions:secrets:set SENDGRID_API_KEY
+   firebase functions:secrets:set SMTP_HOST
+   firebase functions:secrets:set SMTP_USER
+   firebase functions:secrets:set SMTP_PASS
    firebase functions:secrets:set MAIL_API_KEYS
    # MAIL_API_KEYS 값 예시: {"<liv-ay-key>":"liv-ay","<admin-key>":"cho-fam-admin"}
+   # 포트는 기본 587(STARTTLS) — 변경 시 .env의 SMTP_PORT (465=TLS)
    ```
 4. 로컬 개발 시 `functions/.env` 생성 (`.env.example` 참고, git에는 커밋되지 않음)
 5. 배포: `firebase deploy --only functions,firestore,hosting`

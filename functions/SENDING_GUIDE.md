@@ -44,7 +44,7 @@ POST https://chofam-home.web.app/api/mail/send
 { "ok": true, "id": "Jk3x...mailLogId", "status": "sent" }
 ```
 
-실패 (`400` 잘못된 요청 / `401` 키 오류 / `502` SendGrid 발송 실패):
+실패 (`400` 잘못된 요청 / `401` 키 오류 / `502` SMTP 발송 실패):
 ```json
 { "ok": false, "error": "to_and_templateId_required" }
 ```
@@ -122,11 +122,11 @@ liv-ay 백엔드의 `/auth/email-verify/send` 처리 흐름에 연결하는 예:
 
 ## 주의사항
 
-- **재시도**: 네트워크 오류로 호출 자체가 실패하면 호출 측에서 재시도하세요. SendGrid
+- **재시도**: 네트워크 오류로 호출 자체가 실패하면 호출 측에서 재시도하세요. SMTP
   발송 실패(`502`)는 이미 `mail_logs`에 `failed`로 기록되므로, 매니저 웹페이지에서
   재전송하거나 `POST /api/mail/logs/:id/resend`(admin 키)로 재시도할 수 있습니다.
 - **속도 제한**: 현재 API 자체에는 rate limit이 없습니다. 대량 발송(마케팅성 메일 등)이
-  필요하면 사전에 공유해 주세요 — SendGrid 발신 평판 보호를 위해 큐잉/제한 로직 추가가
-  필요할 수 있습니다.
+  필요하면 사전에 공유해 주세요 — 발신 도메인/릴레이 평판 보호를 위해 큐잉/제한 로직
+  추가가 필요할 수 있습니다.
 - **템플릿 관리**: `templateId`는 SendGrid 대시보드에서 직접 만들고 ID를 호출 측 코드에
   반영합니다. 템플릿 자체는 이 저장소에서 관리하지 않습니다.

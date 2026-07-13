@@ -1,4 +1,6 @@
-const sgMail = require('@sendgrid/mail');
+// 발송 파이프: nodemailer + SMTP 릴레이 (provider 중립 — SMTP_* 시크릿만 갈아끼우면
+// SES/SMTP2GO/Brevo 등 어떤 릴레이든 사용 가능). 템플릿·로그·인증은 자체 구현 그대로.
+const nodemailer = require('nodemailer');
 const { mailLogs, mailTemplates } = require('./firestore');
 
 const FROM_ADDRESS = process.env.MAIL_FROM_ADDRESS || 'hichofam@gmail.com';
@@ -36,12 +38,18 @@ function invalidateTemplateCache(templateKey) {
   templateCache.delete(templateKey);
 }
 
-let initialized = false;
-function ensureInitialized() {
-  if (!initialized) {
-    sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-    initialized = true;
+let transporter = null;
+function getTransporter() {
+  if (!transporter) {
+    const port = Number(process.env.SMTP_PORT || 587);
+    transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port,
+      secure: port === 465, // 465=implicit TLS, 587=STARTTLS
+      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+    });
   }
+  return transporter;
 }
 
 function renderTemplate(text, data) {
@@ -52,8 +60,6 @@ function renderTemplate(text, data) {
 }
 
 async function dispatch({ to, templateKey, location = 'ko', dynamicData = {}, source }) {
-  ensureInitialized();
-
   console.log(`Sending email to ${to} (templateKey: ${templateKey}, location: ${location})`);
 
   // Prefetch template (using cache)
@@ -81,7 +87,7 @@ async function dispatch({ to, templateKey, location = 'ko', dynamicData = {}, so
     mailOptions.subject = subject;
     mailOptions.html = html;
 
-    await sgMail.send(mailOptions);
+    await getTransporter().sendMail(mailOptions);
     const logRef = await mailLogs.add({
       to,
       templateKey,
@@ -94,7 +100,8 @@ async function dispatch({ to, templateKey, location = 'ko', dynamicData = {}, so
     });
     return { id: logRef.id, status: 'sent' };
   } catch (err) {
-    const errorMessage = err.response?.body?.errors?.[0]?.message || err.message;
+    // nodemailer SMTP 오류는 message에 서버 응답이 담긴다 (SendGrid SDK의 중첩 구조와 다름)
+    const errorMessage = err.message;
     console.error(`Failed to send email to ${to}: ${errorMessage}`);
     const messageWithSender = `${errorMessage} (sender: ${FROM_ADDRESS})`;
     const logRef = await mailLogs.add({
