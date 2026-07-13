@@ -5,6 +5,11 @@
 > **단계 1**: GPU·상시 프로세스가 필요해진 시점 — 자체 PaaS(`platform/`) 투입
 > 설계 배경: [cloud-platform-paas-design-review.md](./cloud-platform-paas-design-review.md)
 
+**⚠️ 실행 위치 주의**: 모든 명령 블록 첫 줄에 `# 실행 위치:`를 표기했다.
+`npm run build`의 build 스크립트는 이 리포에서는 `platform/console/`에만 있다 —
+리포 루트는 package.json이 없고(`ENOENT`), `functions/`는 빌드 단계가 없어서
+(`Missing script: "build"`) 다른 위치에서 실행하면 에러가 난다.
+
 ---
 
 ## 1. 어느 경로로 배포할지 결정
@@ -25,6 +30,7 @@
 ### 2.1 React 앱 → Firebase Hosting (현재 CHO-FAM 방식)
 
 ```bash
+# 실행 위치: 배포할 React 앱 리포의 루트 (chofam 리포가 아님!)
 npm run build                          # 산출물: dist/ 또는 build/
 firebase deploy --only hosting         # 운영 배포
 
@@ -49,6 +55,7 @@ firebase hosting:channel:deploy pr-42 --expires 7d
 ```
 
 ```bash
+# 실행 위치: 배포할 React 앱 리포의 루트
 npm i -g netlify-cli
 netlify init                        # 리포 연결 (이후 git push = 자동 배포)
 netlify deploy --prod               # 수동 배포가 필요할 때
@@ -62,8 +69,10 @@ netlify deploy --prod               # 수동 배포가 필요할 때
 `functions/` 패턴 그대로 (Express 라우터 추가 → 배포):
 
 ```bash
+# 실행 위치: chofam 리포의 functions/
 cd functions && npm test
 firebase deploy --only functions
+# 주의: functions에는 build 스크립트가 없음 — 빌드 단계 자체가 불필요 (배포가 곧 빌드)
 ```
 
 ### 2.4 메일·결제 — CHO-FAM API 호출 (재구현 금지)
@@ -87,9 +96,10 @@ curl -X POST https://cho-fam.web.app/api/payout/request \
 
 ## 3. 단계 1 — 자체 PaaS 배포
 
-### 3.1 서버 준비 (Ubuntu 22.04+ 기준)
+### 3.1 서버 준비 — Linux (Ubuntu 22.04+, 운영 권장)
 
 ```bash
+# 실행 위치: 서버 셸 (아무 위치)
 # Docker Engine
 curl -fsSL https://get.docker.com | sh
 
@@ -104,39 +114,55 @@ sudo apt install -y caddy
 
 DNS: 와일드카드 A 레코드 `*.deploy.example.com → 서버 IP` 하나면 프로젝트별 도메인이 자동 해결된다.
 
-> macOS/Windows에서 돌릴 때의 차이(GPU 불가, Colima/WSL2 권장)는
-> [platform/README.md의 "설치 빌드옵션"](../platform/README.md) 참고.
+> macOS는 Colima(무료) 권장·GPU 불가 — [platform/README.md의 "설치 빌드옵션"](../platform/README.md) 참고.
+> **Windows는 3.6절**에 별도 절차가 있다.
 
-### 3.2 플랫폼 설치
+### 3.2 플랫폼 설치 (환경설정)
 
 ```bash
+# 실행 위치: 서버 셸 — 이후 모든 명령은 /opt/paas/platform 기준
 git clone https://github.com/hs9147/chofam /opt/paas && cd /opt/paas/platform
 pip install -r requirements.txt docker
 cp .env.example .env
 ```
 
-`.env` 필수값 생성:
+`.env` 환경설정 정리 (전체 목록·기본값은 [platform/.env.example](../platform/.env.example)):
+
+| 키 | 필수 | 설명 |
+| --- | --- | --- |
+| `PAAS_ADMIN_API_KEY` | ✅ | 관리자 키. 비우면 기동마다 임시 키가 로그에 출력됨 — 운영에서는 고정 |
+| `PAAS_FERNET_KEY` | ✅ | 환경변수 암호화 키. **분실 시 저장된 시크릿 복호화 불가** — 백업 필수 |
+| `PAAS_WEBHOOK_SECRET` | ✅(웹훅 사용 시) | GitHub/Gitea 웹훅 서명 검증 |
+| `PAAS_BASE_DOMAIN` | ✅ | 예: `deploy.example.com` — 프로젝트 도메인의 기준 |
+| `PAAS_FEATURES` | 선택 | 기본 전체. 메일·결제를 CHO-FAM Functions가 담당하면 `deploy,workspace` |
+| `PAAS_TIER` | 선택 | `small`(기본, Docker) / `enterprise`(K8s) |
+| `PAAS_HOST_OS` | 선택 | 기본 `auto` 감지. 컨테이너 안 등 감지가 틀릴 때만 명시 |
+| `PAAS_DATABASE_URL` | 선택 | 기본 SQLite. 규모 커지면 PostgreSQL DSN |
+
+필수 키 생성 명령:
 
 ```bash
-# 관리자 키 / Fernet 키 / 웹훅 시크릿
+# 실행 위치: /opt/paas/platform (venv 활성 상태)
 python3 -c "import secrets; print('paas_' + secrets.token_urlsafe(32))"   # PAAS_ADMIN_API_KEY
 python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"  # PAAS_FERNET_KEY
 openssl rand -hex 32                                                       # PAAS_WEBHOOK_SECRET
 ```
 
-메일·결제는 CHO-FAM Functions가 담당하므로 **모듈을 끄고** 기동:
+기동:
 
 ```bash
-# .env: PAAS_FEATURES=deploy,workspace  /  PAAS_BASE_DOMAIN=deploy.example.com
+# 실행 위치: /opt/paas/platform
 uvicorn app.main:app --host 127.0.0.1 --port 7000   # 운영은 systemd 서비스로
 
-# 콘솔 UI까지 쓰려면
-cd console && npm install && npm run build   # 이후 https://.../console/ 접속
+# 콘솔 UI 빌드 — 반드시 platform/console 에서! (build 스크립트는 여기에만 있음)
+cd /opt/paas/platform/console && npm install && npm run build
+# 이후 https://paas.example.com/console/ 접속
 ```
 
 ### 3.3 프로젝트 등록 → 배포 → 확인 (FastAPI 앱 예시)
 
 ```bash
+# 실행 위치: 아무 곳이나 — 플랫폼 API 호출이므로 curl만 있으면 됨 (콘솔 UI로도 동일 작업 가능)
 BASE=http://127.0.0.1:7000  ADMIN=paas_...
 
 # 1) 프로젝트 등록
@@ -184,7 +210,64 @@ curl -X POST $BASE/projects/2/deploy -H "x-api-key: $ADMIN" \
 배포된 LLM은 OpenAI 호환 엔드포인트가 되며, 콘솔 → LLM 프로바이더에
 `base_url: project://llm-main`으로 등록하면 코드 워크스페이스(채팅·리뷰)가 내부 LLM으로 동작한다.
 
-### 3.6 관리형 자산과 연결 (모듈 바인딩)
+### 3.6 Windows에서 PaaS 실행
+
+두 가지 방법이 있고, **A(WSL2)를 권장**한다 — GPU 지원·Docker 무료 구성·Linux와 동일 절차라는 세 가지 이점 때문.
+
+#### A. WSL2 안에서 실행 (권장)
+
+```powershell
+# 실행 위치: PowerShell (관리자)
+wsl --install -d Ubuntu     # 최초 1회, 재부팅 필요
+```
+
+이후 **WSL Ubuntu 터미널에서 3.1~3.2절의 Linux 절차를 그대로** 따른다.
+Docker는 둘 중 하나:
+- Docker Desktop 설치 후 Settings → Resources → WSL Integration에서 Ubuntu 켜기 (기업 규모에 따라 유료)
+- 또는 WSL Ubuntu 안에 Docker Engine 직접 설치 (`curl -fsSL https://get.docker.com | sh`, 무료)
+
+GPU: 호스트에 NVIDIA 드라이버만 설치하면 WSL2가 자동 노출한다(별도 드라이버 불필요).
+WSL 안에서는 `PAAS_HOST_OS`가 `linux`로 감지되며 GPU 배포가 그대로 동작한다.
+
+#### B. 네이티브 Windows (PowerShell)
+
+Docker Desktop(WSL2 백엔드) 설치가 선행되어야 한다.
+
+```powershell
+# 실행 위치: PowerShell
+git clone https://github.com/hs9147/chofam C:\paas
+cd C:\paas\platform
+py -3.12 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt docker
+Copy-Item .env.example .env
+
+# 필수 키 생성 (openssl 대신 파이썬으로 통일)
+python -c "import secrets; print('paas_' + secrets.token_urlsafe(32))"                      # PAAS_ADMIN_API_KEY
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"   # PAAS_FERNET_KEY
+python -c "import secrets; print(secrets.token_hex(32))"                                    # PAAS_WEBHOOK_SECRET
+
+# 기동 (.env 편집 후)
+uvicorn app.main:app --host 127.0.0.1 --port 7000
+```
+
+```powershell
+# 콘솔 UI 빌드 — 반드시 platform\console 에서!
+cd C:\paas\platform\console
+npm install
+npm run build
+```
+
+네이티브 실행 시 알아둘 것:
+
+- `PAAS_HOST_OS`는 `windows`로 자동 감지된다. GPU는 Docker Desktop의 WSL2 백엔드를 경유해 지원.
+- Caddy: `winget install CaddyServer.Caddy` (또는 scoop/choco) 후 Caddyfile에
+  `import C:\paas\platform\data\caddy-sites\*.caddy` 추가. `caddy run --config <Caddyfile>`.
+- 서비스 등록(부팅 시 자동 시작): [NSSM](https://nssm.cc)으로 uvicorn·caddy를 Windows 서비스로 등록.
+- 한글 등 파일 인코딩은 플랫폼 코드가 UTF-8을 명시해 처리한다 — Windows CI에서 전 테스트 통과 확인됨.
+- 팀 규모가 크면 Docker Desktop 라이선스(기업 유료)를 확인할 것 — 부담되면 A(WSL2 + Docker Engine) 방식이 무료.
+
+### 3.7 관리형 자산과 연결 (모듈 바인딩)
 
 자체 PaaS의 앱이 CHO-FAM 메일 API를 쓰게 하려면:
 
