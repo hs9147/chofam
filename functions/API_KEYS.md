@@ -39,6 +39,8 @@ firebase functions:secrets:set MAIL_API_KEYS
   웹페이지(`/admin/mail/`)에서 서비스별 필터로 사용됩니다.
 - 관리자(로그 조회/재전송) 권한이 필요한 서비스는 `MAIL_ADMIN_SOURCES`에도 해당
   `source` 이름을 추가해야 합니다 (기본값: `cho-fam-admin`).
+- 같은 키 맵이 `/api/payout/*`(토스 지급대행) 인증에도 쓰입니다. 지급 API를 호출할 수
+  있는 소스는 `PAYOUT_SOURCES`(기본값: `liv-ay`)로 별도 제한됩니다.
 
 ```bash
 firebase functions:secrets:set MAIL_ADMIN_SOURCES
@@ -73,7 +75,7 @@ firebase emulators:start --only functions
 curl -X POST https://cho-fam.web.app/api/mail/send \
   -H "x-api-key: sk_liv_ay_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" \
   -H "Content-Type: application/json" \
-  -d '{"to":"user@example.com","templateId":"d-xxxxxxxx","dynamicData":{"code":"123456"}}'
+  -d '{"to":"user@example.com","templateKey":"liv_ay_email_verification","dynamicData":{"code":"123456"}}'
 ```
 
 ## 6. 키 폐기/교체
