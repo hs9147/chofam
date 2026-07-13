@@ -48,14 +48,14 @@ def read_context_files(workdir: Path, paths: list[str]) -> dict[str, str]:
             continue
         if p.stat().st_size > MAX_CONTEXT_FILE_BYTES:
             continue
-        result[rel] = p.read_text(errors="replace")
+        result[rel] = p.read_text(encoding="utf-8", errors="replace")
     return result
 
 
 def apply_diff(workdir: Path, diff: str, message: str) -> str:
     """diff를 적용하고 커밋한 뒤 커밋 SHA를 반환한다."""
     patch = workdir / ".paas-proposed.patch"
-    patch.write_text(diff if diff.endswith("\n") else diff + "\n")
+    patch.write_text(diff if diff.endswith("\n") else diff + "\n", encoding="utf-8")
     try:
         _git(workdir, "apply", "--whitespace=nowarn", str(patch))
     finally:

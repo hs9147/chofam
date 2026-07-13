@@ -15,7 +15,15 @@ router = APIRouter(tags=["system"])
 
 @router.get("/health")
 def health():
-    return {"ok": True, "tier": get_settings().tier}
+    from ..features import enabled_features  # noqa: PLC0415
+    from ..services.host import get_host_caps  # noqa: PLC0415
+
+    return {
+        "ok": True,
+        "tier": get_settings().tier,
+        "host_os": get_host_caps().os,
+        "features": sorted(enabled_features()),
+    }
 
 
 @router.get("/status")

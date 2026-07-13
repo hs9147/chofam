@@ -114,11 +114,33 @@ export interface GpuInfo {
 }
 
 export interface StatusSnapshot {
+  host_os?: string;
+  gpu_supported?: boolean;
+  docker_hint?: string;
   cpu_percent?: number;
   memory?: { total: number; used: number; percent: number };
   disk?: { total: number; used: number; percent: number };
   gpus: GpuInfo[];
   system?: string;
+}
+
+export interface HealthInfo {
+  ok: boolean;
+  tier: string;
+  host_os: string;
+  features: string[];
+}
+
+export interface PaymentOut {
+  id: number;
+  order_id: string;
+  payment_key: string;
+  amount: number;
+  status: 'ready' | 'confirmed' | 'canceled' | 'failed';
+  method: string | null;
+  source: string;
+  fail_reason: string | null;
+  created_at: string;
 }
 
 export interface ApiKeyIssued {

@@ -18,6 +18,24 @@ class Settings(BaseSettings):
     # 1차(small): Docker 단일/소수 서버, 2차(enterprise): Kubernetes 클러스터
     tier: Tier = "small"
 
+    # --- 설치 빌드옵션 ---
+    # 기능 모듈 선택 (core는 항상 켜짐). 예: "deploy" 만 켜면 배포 전용 서버.
+    features: str = "deploy,workspace,mail,payment"
+    # 운영환경 OS. auto면 platform.system()으로 감지. 컨테이너 등 감지가 틀릴 때 명시.
+    host_os: Literal["auto", "linux", "macos", "windows"] = "auto"
+    # 기능 매트릭스가 GPU 불가로 판단해도 강제 허용 (예: 커스텀 GPU 런타임)
+    force_gpu: bool = False
+
+    # --- mail 모듈: CHO-FAM 메일 API 연동 ---
+    mail_api_url: str = ""  # 예: https://cho-fam.web.app/api/mail
+    mail_api_key: str = ""
+    mail_alert_to: str = ""  # 관리자 알림 수신 주소
+    mail_template_id: str = ""  # 알림용 SendGrid 동적 템플릿 ID
+
+    # --- payment 모듈: 토스페이먼츠 ---
+    toss_secret_key: str = ""
+    toss_api_base: str = "https://api.tosspayments.com"
+
     database_url: str = "sqlite:///./paas.db"
     base_domain: str = "deploy.localhost"
 

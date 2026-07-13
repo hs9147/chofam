@@ -1,9 +1,15 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { api } from '../lib/api';
 import { isAdmin, logout } from '../lib/auth';
+import { useApi } from '../lib/hooks';
 
 export default function Layout() {
   const navigate = useNavigate();
   const admin = isAdmin();
+  // 설치 빌드옵션(기능 모듈·호스트 OS)에 맞춰 메뉴를 구성한다
+  const health = useApi(() => api.health());
+  const features = health.data?.features ?? [];
+  const has = (f: string) => features.includes(f);
 
   return (
     <>
@@ -13,10 +19,16 @@ export default function Layout() {
           {admin && <NavLink to="/">대시보드</NavLink>}
           <NavLink to="/projects">프로젝트</NavLink>
           <NavLink to="/modules">모듈</NavLink>
-          <NavLink to="/providers">LLM</NavLink>
-          <NavLink to="/chat">채팅</NavLink>
+          {has('workspace') && <NavLink to="/providers">LLM</NavLink>}
+          {has('workspace') && <NavLink to="/chat">채팅</NavLink>}
+          {has('payment') && admin && <NavLink to="/payments">결제</NavLink>}
           {admin && <NavLink to="/audit">감사 로그</NavLink>}
         </nav>
+        {health.data && (
+          <span className="status dim" title={`tier=${health.data.tier}`}>
+            {health.data.host_os}
+          </span>
+        )}
         <span className="mutedtext" style={{ fontSize: 12 }}>
           {admin ? 'admin' : 'member'}
         </span>

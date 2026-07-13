@@ -3,7 +3,14 @@ from typing import Any
 
 
 def snapshot() -> dict[str, Any]:
-    data: dict[str, Any] = {}
+    from .host import get_host_caps  # noqa: PLC0415
+
+    caps = get_host_caps()
+    data: dict[str, Any] = {
+        "host_os": caps.os,
+        "gpu_supported": caps.gpu_supported,
+        "docker_hint": caps.docker_hint,
+    }
     try:
         import psutil  # noqa: PLC0415
 

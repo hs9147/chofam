@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from .. import audit
 from ..db import get_db
+from ..features import require_feature
 from ..models import ApiKey, BuildProfile, Deployment, EnvVar, Project
 from ..schemas import (
     DeploymentOut,
@@ -47,7 +48,8 @@ def create_project(
     return project
 
 
-@router.post("/{project_id}/deploy", response_model=DeploymentOut)
+@router.post("/{project_id}/deploy", response_model=DeploymentOut,
+             dependencies=[Depends(require_feature("deploy"))])
 async def deploy_project(
     project_id: int,
     body: DeployRequest,
@@ -69,7 +71,8 @@ async def deploy_project(
     return record
 
 
-@router.post("/{project_id}/rollback", response_model=DeploymentOut)
+@router.post("/{project_id}/rollback", response_model=DeploymentOut,
+             dependencies=[Depends(require_feature("deploy"))])
 def rollback_project(
     project_id: int,
     profile: BuildProfile = BuildProfile.release,
@@ -88,7 +91,8 @@ def rollback_project(
     return record
 
 
-@router.post("/{project_id}/stop", status_code=204)
+@router.post("/{project_id}/stop", status_code=204,
+             dependencies=[Depends(require_feature("deploy"))])
 def stop_project(
     project_id: int,
     profile: BuildProfile = BuildProfile.release,
@@ -100,7 +104,8 @@ def stop_project(
     audit.record(db, key.name, "stop", project.name, {"profile": profile.value})
 
 
-@router.get("/{project_id}/deployments", response_model=list[DeploymentOut])
+@router.get("/{project_id}/deployments", response_model=list[DeploymentOut],
+            dependencies=[Depends(require_feature("deploy"))])
 def list_deployments(
     project_id: int,
     db: Session = Depends(get_db),
@@ -119,7 +124,7 @@ def list_deployments(
     )
 
 
-@router.get("/{project_id}/logs")
+@router.get("/{project_id}/logs", dependencies=[Depends(require_feature("deploy"))])
 def project_logs(
     project_id: int,
     profile: BuildProfile = BuildProfile.release,
@@ -131,7 +136,7 @@ def project_logs(
     return {"logs": deployer.get_runtime().logs(project.name, profile, tail)}
 
 
-@router.get("/{project_id}/status")
+@router.get("/{project_id}/status", dependencies=[Depends(require_feature("deploy"))])
 def project_status(
     project_id: int,
     db: Session = Depends(get_db),
