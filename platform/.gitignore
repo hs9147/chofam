@@ -4,3 +4,5 @@ __pycache__/
 paas.db
 data/
 .venv/
+console/node_modules/
+console/dist/

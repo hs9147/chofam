@@ -1,6 +1,9 @@
+import os
 import secrets
+from pathlib import Path
 
 from fastapi import FastAPI
+from starlette.staticfiles import StaticFiles
 
 from .api import llm, modules, previews, projects, system, webhooks
 from .config import get_settings
@@ -31,6 +34,14 @@ def create_app() -> FastAPI:
     app.include_router(llm.router)
     app.include_router(modules.router)
     app.include_router(previews.router)
+
+    # 콘솔 UI(React 빌드 산출물) — dist가 있을 때만 마운트, 없어도 API는 동일 기동
+    console_dist = Path(
+        os.environ.get("PAAS_CONSOLE_DIST")
+        or Path(__file__).resolve().parents[1] / "console" / "dist"
+    )
+    if console_dist.is_dir():
+        app.mount("/console", StaticFiles(directory=console_dist, html=True), name="console")
     return app
 
 

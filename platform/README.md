@@ -120,6 +120,28 @@ DELETE /previews/{id}
   (small: `https://{target}.{base_domain}`, enterprise: `http://paas-{target}.{ns}.svc`).
 - 프리뷰는 development 프로필 빌드를 재사용하되 CPU 50%·GPU 금지·동시 5개 제한·TTL 회수가 걸립니다.
 
+## 콘솔 UI (`console/`)
+
+React + Vite 관리 대시보드. 빌드 산출물(`console/dist`)이 있으면 FastAPI가 `/console`에 자동
+마운트합니다(없어도 API는 동일 기동).
+
+```bash
+cd platform/console
+npm install
+npm run build        # tsc 타입체크 + vite build → dist/
+# 개발 모드: npm run dev (http://localhost:5173/console/, API는 :7000으로 프록시)
+```
+
+- 접속: `http://<서버>:7000/console/` → API 키로 로그인
+  (admin 키: 대시보드·감사 로그·키 발급·프로바이더 등록 포함, 일반 키: 프로젝트 운영 화면)
+- 화면: 시스템 대시보드(CPU/메모리/디스크/GPU 게이지, 키 발급), 프로젝트(생성·dev/release
+  배포·롤백·중지·배포 이력·로그 3초 폴링·환경변수·모듈 바인딩·프리뷰), 모듈 레지스트리,
+  LLM 프로바이더, 대화식 코드 편집(diff 뷰 + 승인/거절 + 브랜치 리뷰), 감사 로그
+- 인증은 `x-api-key`를 sessionStorage에 보관(기존 admin/mail 관례). 로그인 검증은 admin 전용
+  `GET /status` 응답 코드(200 admin / 403 일반 / 401 무효)를 프로브로 재사용
+- 의존성: react·react-dom·react-router-dom (전부 MIT). 라우팅은 해시 기반이라 새로고침·딥링크에
+  백엔드 폴백이 필요 없습니다
+
 ## 테스트
 
 ```bash
