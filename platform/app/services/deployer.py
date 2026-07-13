@@ -46,6 +46,8 @@ def resolve_env(db: Session, project: Project, profile: BuildProfile) -> dict[st
 def make_spec(
     db: Session, project: Project, image_tag: str, profile: BuildProfile
 ) -> RuntimeSpec:
+    from .host import gpu_allowed  # noqa: PLC0415
+
     settings = get_settings()
     return RuntimeSpec(
         project_name=project.name,
@@ -57,7 +59,7 @@ def make_spec(
         memory_limit=project.memory_limit or settings.default_memory_limit,
         cpu_limit=project.cpu_limit or settings.default_cpu_limit,
         replicas=PROFILES[profile].replicas,
-        gpu=project.type.value == "llm",
+        gpu=project.type.value == "llm" and gpu_allowed(),
         health_check_path=project.health_check_path,
     )
 
@@ -104,6 +106,12 @@ def deploy_sync(
                 record.build_log_path = str(e.log_path)
             record.finished_at = datetime.now(timezone.utc)
             db.commit()
+            from . import notify  # noqa: PLC0415 — mail 모듈 (비활성 시 no-op)
+
+            notify.send_alert(
+                f"[paas] {project.name} {profile.value} 배포 실패",
+                f"sha={record.git_sha}\n{str(e)[:1000]}",
+            )
             raise
     finally:
         lock.release()

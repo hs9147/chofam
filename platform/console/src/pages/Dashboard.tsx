@@ -39,6 +39,12 @@ export default function Dashboard() {
         <Async state={state}>
           {(s) => (
             <>
+              {s.host_os && (
+                <p className="mutedtext" style={{ marginTop: 0 }}>
+                  운영환경: <span className="status info">{s.host_os}</span>{' '}
+                  {s.docker_hint} · GPU {s.gpu_supported ? '지원' : '미지원'}
+                </p>
+              )}
               {s.system && <p className="mutedtext">{s.system}</p>}
               {s.cpu_percent !== undefined && <Gauge label="CPU" percent={s.cpu_percent} />}
               {s.memory && (

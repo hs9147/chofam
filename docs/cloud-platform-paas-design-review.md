@@ -415,6 +415,9 @@ POST /projects/{id}/preview        DELETE /previews/{id}
   리소스 50%/100%, replicas 1/2, 도메인 {name}-dev.* / {name}.*, 동시 기동 지원
 - 무중단 배포(1차: 블루-그린+헬스체크+Caddy 전환, 2차: RollingUpdate), 롤백(이미지 태그 재기동),
   웹훅 HMAC 검증(GitHub/Gitea), EnvVar Fernet 암호화, API 키 인증, 감사 로그 포함
+- **설치 빌드옵션 구현 완료**: 기능 모듈 선택(`PAAS_FEATURES` — deploy/workspace/mail/payment,
+  core 상시) + 운영환경 OS(`PAAS_HOST_OS` — linux/macos/windows 자동 감지, GPU 기능 매트릭스),
+  mail 알림(CHO-FAM 메일 API)·토스페이먼츠 결제 수납 모듈, 3-OS CI 매트릭스 포함
 - **12절 코드 워크스페이스 구현 완료**: LLM 프로바이더 추상화(외부 + `project://` 내부 해석),
   대화식 편집(diff 제안 → 승인 시에만 커밋), 코드 리뷰(심각도 분류), Module 레지스트리
   4타입(민감 config 암호화·티어별 internal_api URL 해석·배포 시 자동 주입),

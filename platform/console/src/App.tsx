@@ -7,6 +7,7 @@ import Chat from './pages/Chat';
 import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
 import Modules from './pages/Modules';
+import Payments from './pages/Payments';
 import ProjectDetail from './pages/ProjectDetail';
 import Projects from './pages/Projects';
 import Providers from './pages/Providers';
@@ -57,6 +58,14 @@ export default function App() {
           <Route path="previews" element={<PreviewsTab />} />
         </Route>
         <Route path="/modules" element={<Modules />} />
+        <Route
+          path="/payments"
+          element={
+            <AdminOnly>
+              <Payments />
+            </AdminOnly>
+          }
+        />
         <Route path="/providers" element={<Providers />} />
         <Route path="/chat" element={<Chat />} />
         <Route

@@ -43,6 +43,15 @@ def _mem_bytes_str(limit: str, factor: float) -> str:
 
 class DockerRuntime(Runtime):
     def start(self, spec: RuntimeSpec) -> Endpoint:
+        if spec.gpu:
+            from ..host import get_host_caps, gpu_allowed  # noqa: PLC0415
+
+            if not gpu_allowed():
+                caps = get_host_caps()
+                raise RuntimeError(
+                    f"이 호스트 OS({caps.os})는 GPU 컨테이너를 지원하지 않습니다. "
+                    f"{caps.gpu_note} (강제하려면 PAAS_FORCE_GPU=true)"
+                )
         client = _docker_client()
         factor = PROFILES[spec.profile].resource_factor
         host_port = allocate_port()

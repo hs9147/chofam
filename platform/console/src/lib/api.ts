@@ -3,6 +3,8 @@ import type {
   ApiKeyIssued,
   AuditRow,
   BuildProfile,
+  HealthInfo,
+  PaymentOut,
   ChatReply,
   ChatSessionOut,
   DeploymentOut,
@@ -73,6 +75,7 @@ async function request<T>(
 
 export const api = {
   // 시스템
+  health: () => request<HealthInfo>('GET', '/health'),
   status: () => request<StatusSnapshot>('GET', '/status'),
   audit: (limit = 100) => request<AuditRow[]>('GET', '/audit', undefined, { limit }),
   issueKey: (name: string, is_admin: boolean) =>
@@ -127,6 +130,12 @@ export const api = {
     request<ReviewResult>('POST', `/projects/${projectId}/review`, {
       provider_id, diff: diff || null, base_ref: base_ref || null,
     }),
+
+  // 결제 (payment 모듈)
+  listPayments: (status?: string, limit = 50) =>
+    request<PaymentOut[]>('GET', '/payments', undefined, { status, limit }),
+  cancelPayment: (paymentKey: string, reason: string) =>
+    request<PaymentOut>('POST', `/payments/${paymentKey}/cancel`, { reason }),
 
   // 프리뷰
   createPreview: (projectId: number, branch?: string, ttl_minutes = 60) =>

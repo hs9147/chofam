@@ -209,6 +209,32 @@ class PreviewSession(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
+class PaymentStatus(str, enum.Enum):
+    ready = "ready"  # 승인 요청 접수(토스 호출 전)
+    confirmed = "confirmed"
+    canceled = "canceled"
+    failed = "failed"
+
+
+class Payment(Base):
+    """payment 모듈 — 토스 결제 승인 기록. 여러 서비스가 공용으로 사용한다."""
+
+    __tablename__ = "payments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    order_id: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    payment_key: Mapped[str] = mapped_column(String(200), index=True)
+    amount: Mapped[int] = mapped_column(Integer)  # KRW 정수
+    status: Mapped[PaymentStatus] = mapped_column(Enum(PaymentStatus), default=PaymentStatus.ready)
+    method: Mapped[str | None] = mapped_column(String(32), nullable=True)  # 카드/가상계좌 등
+    source: Mapped[str] = mapped_column(String(64))  # 호출한 API 키 이름
+    fail_reason: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+
 class AuditEvent(Base):
     """감사 로그. 2차(대기업) 요구를 위해 1차부터 배포·롤백·시크릿 변경·키 발급을 기록한다."""
 

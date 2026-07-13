@@ -5,9 +5,10 @@ from pathlib import Path
 from fastapi import FastAPI
 from starlette.staticfiles import StaticFiles
 
-from .api import llm, modules, previews, projects, system, webhooks
+from .api import llm, modules, payments, previews, projects, system, webhooks
 from .config import get_settings
 from .db import Base, engine
+from .features import enabled_features
 
 
 def create_app() -> FastAPI:
@@ -28,12 +29,21 @@ def create_app() -> FastAPI:
         ),
         version="0.1.0",
     )
+    features = enabled_features()
+
+    # core — 항상 켜짐 (projects 안의 배포 계열 엔드포인트는 require_feature("deploy")로 게이트)
     app.include_router(system.router)
     app.include_router(projects.router)
-    app.include_router(webhooks.router)
-    app.include_router(llm.router)
     app.include_router(modules.router)
-    app.include_router(previews.router)
+
+    # 선택 모듈 (설치 빌드옵션)
+    if "deploy" in features:
+        app.include_router(webhooks.router)
+        app.include_router(previews.router)
+    if "workspace" in features:
+        app.include_router(llm.router)
+    if "payment" in features:
+        app.include_router(payments.router)
 
     # 콘솔 UI(React 빌드 산출물) — dist가 있을 때만 마운트, 없어도 API는 동일 기동
     console_dist = Path(
