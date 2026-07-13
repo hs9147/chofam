@@ -1,0 +1,216 @@
+"""LLM 프로바이더 · 대화식 편집(diff 제안/승인) · 코드 리뷰."""
+import asyncio
+import json
+
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from .. import audit
+from ..db import get_db
+from ..models import (
+    ApiKey,
+    ChangeStatus,
+    ChatMessage,
+    ChatSession,
+    LlmProvider,
+    LlmProviderKind,
+    Project,
+    ProposedChange,
+)
+from ..schemas import (
+    ChatMessageIn,
+    ChatReply,
+    ChatSessionCreate,
+    LlmProviderCreate,
+    LlmProviderOut,
+    ReviewRequest,
+)
+from ..security import encrypt_value, require_admin, require_api_key
+from ..services import llm as llm_service
+from ..services import modules as modules_service
+from ..services import workspace
+
+router = APIRouter(tags=["llm"])
+
+
+def _provider_out(p: LlmProvider) -> LlmProviderOut:
+    return LlmProviderOut(
+        id=p.id, name=p.name, kind=p.kind.value, base_url=p.base_url,
+        model=p.model, has_api_key=bool(p.api_key_encrypted),
+    )
+
+
+@router.post("/llm/providers", response_model=LlmProviderOut, status_code=201)
+def create_provider(
+    body: LlmProviderCreate,
+    db: Session = Depends(get_db),
+    admin: ApiKey = Depends(require_admin),
+):
+    if db.execute(select(LlmProvider).where(LlmProvider.name == body.name)).scalar_one_or_none():
+        raise HTTPException(status_code=409, detail="provider name already exists")
+    row = LlmProvider(
+        name=body.name,
+        kind=LlmProviderKind(body.kind),
+        base_url=body.base_url,
+        api_key_encrypted=encrypt_value(body.api_key) if body.api_key else None,
+        model=body.model,
+    )
+    db.add(row)
+    db.commit()
+    audit.record(db, admin.name, "llm.provider.create", body.name, {"kind": body.kind})
+    return _provider_out(row)
+
+
+@router.get("/llm/providers", response_model=list[LlmProviderOut])
+def list_providers(db: Session = Depends(get_db), _: ApiKey = Depends(require_api_key)):
+    rows = db.execute(select(LlmProvider).order_by(LlmProvider.id)).scalars()
+    return [_provider_out(p) for p in rows]
+
+
+@router.post("/chat/sessions")
+def create_session(
+    body: ChatSessionCreate,
+    db: Session = Depends(get_db),
+    key: ApiKey = Depends(require_api_key),
+):
+    project = db.get(Project, body.project_id)
+    provider = db.get(LlmProvider, body.provider_id)
+    if project is None or provider is None:
+        raise HTTPException(status_code=404, detail="project or provider not found")
+    session = ChatSession(project_id=project.id, provider_id=provider.id, branch="")
+    db.add(session)
+    db.commit()
+    session.branch = body.branch or f"paas/chat-{session.id}"
+    db.commit()
+    audit.record(db, key.name, "chat.session.create", project.name,
+                 {"provider": provider.name, "branch": session.branch})
+    return {"id": session.id, "branch": session.branch, "provider": provider.name}
+
+
+@router.post("/chat/sessions/{session_id}/messages", response_model=ChatReply)
+async def post_message(
+    session_id: int,
+    body: ChatMessageIn,
+    db: Session = Depends(get_db),
+    _: ApiKey = Depends(require_api_key),
+):
+    session = db.get(ChatSession, session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="session not found")
+    project = db.get(Project, session.project_id)
+    provider = db.get(LlmProvider, session.provider_id)
+
+    messages: list[dict] = [{"role": "system", "content": llm_service.EDIT_SYSTEM_PROMPT}]
+
+    # 프로젝트 컨텍스트: 바인딩된 모듈 규약 + 파일 트리 + 요청 파일 내용
+    module_ctx = modules_service.context_for_llm(db, project)
+    workdir = workspace.workdir_for(project)
+    context_parts = [f"Project: {project.name} (type={project.type.value})"]
+    if module_ctx:
+        context_parts.append("Bound modules (use these env vars):\n" + json.dumps(module_ctx))
+    if workdir.exists():
+        context_parts.append("Files:\n" + "\n".join(workspace.file_tree(workdir)))
+        for path, content in workspace.read_context_files(workdir, body.files).items():
+            context_parts.append(f"--- {path} ---\n{content}")
+    messages.append({"role": "system", "content": "\n\n".join(context_parts)})
+
+    history = db.execute(
+        select(ChatMessage).where(ChatMessage.session_id == session_id).order_by(ChatMessage.id)
+    ).scalars()
+    messages.extend({"role": m.role, "content": m.content} for m in history)
+    messages.append({"role": "user", "content": body.content})
+
+    try:
+        reply = await asyncio.to_thread(llm_service.chat_completion, provider, messages)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"llm call failed: {e}")
+
+    db.add(ChatMessage(session_id=session_id, role="user", content=body.content))
+    db.add(ChatMessage(session_id=session_id, role="assistant", content=reply))
+    db.commit()
+
+    change_id = None
+    diff = llm_service.extract_diff(reply)
+    if diff:
+        change = ProposedChange(
+            session_id=session_id, diff=diff, summary=body.content[:255]
+        )
+        db.add(change)
+        db.commit()
+        change_id = change.id
+    return ChatReply(reply=reply, proposed_change_id=change_id)
+
+
+@router.post("/changes/{change_id}/apply")
+async def apply_change(
+    change_id: int,
+    db: Session = Depends(get_db),
+    key: ApiKey = Depends(require_api_key),
+):
+    change = db.get(ProposedChange, change_id)
+    if change is None:
+        raise HTTPException(status_code=404, detail="change not found")
+    if change.status != ChangeStatus.proposed:
+        raise HTTPException(status_code=409, detail=f"change already {change.status.value}")
+    session = db.get(ChatSession, change.session_id)
+    project = db.get(Project, session.project_id)
+    try:
+        workdir = await asyncio.to_thread(workspace.ensure_branch, project, session.branch)
+        sha = await asyncio.to_thread(
+            workspace.apply_diff, workdir, change.diff,
+            f"chat: {change.summary or f'change #{change.id}'}",
+        )
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=f"diff apply failed: {e}")
+    change.status = ChangeStatus.applied
+    change.applied_sha = sha
+    db.commit()
+    audit.record(db, key.name, "chat.change.apply", project.name,
+                 {"change_id": change.id, "sha": sha, "branch": session.branch})
+    return {"applied_sha": sha, "branch": session.branch}
+
+
+@router.post("/changes/{change_id}/reject", status_code=204)
+def reject_change(
+    change_id: int,
+    db: Session = Depends(get_db),
+    _: ApiKey = Depends(require_api_key),
+):
+    change = db.get(ProposedChange, change_id)
+    if change is None:
+        raise HTTPException(status_code=404, detail="change not found")
+    change.status = ChangeStatus.rejected
+    db.commit()
+
+
+@router.post("/projects/{project_id}/review")
+async def review_project(
+    project_id: int,
+    body: ReviewRequest,
+    db: Session = Depends(get_db),
+    key: ApiKey = Depends(require_api_key),
+):
+    project = db.get(Project, project_id)
+    provider = db.get(LlmProvider, body.provider_id)
+    if project is None or provider is None:
+        raise HTTPException(status_code=404, detail="project or provider not found")
+
+    diff = body.diff
+    if diff is None:
+        workdir = workspace.workdir_for(project)
+        if not workdir.exists():
+            raise HTTPException(status_code=409, detail="no workspace; pass diff explicitly")
+        base = body.base_ref or f"origin/{project.branch}"
+        diff = await asyncio.to_thread(workspace.diff_between, workdir, base)
+    if not diff.strip():
+        return {"findings": [], "max_severity": "none"}
+
+    try:
+        findings = await asyncio.to_thread(llm_service.review_diff, provider, diff)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"llm call failed: {e}")
+    severity = llm_service.max_severity(findings)
+    audit.record(db, key.name, "code.review", project.name,
+                 {"findings": len(findings), "max_severity": severity})
+    return {"findings": findings, "max_severity": severity}
