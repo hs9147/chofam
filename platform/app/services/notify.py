@@ -17,7 +17,9 @@ def send_alert(subject: str, body: str) -> bool:
             and settings.mail_template_id):
         return False
     try:
-        res = httpx.post(
+        from .httpx_retry import post_with_retry  # noqa: PLC0415
+
+        res = post_with_retry(
             f"{settings.mail_api_url.rstrip('/')}/send",
             headers={"x-api-key": settings.mail_api_key},
             json={
