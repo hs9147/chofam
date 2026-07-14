@@ -279,6 +279,10 @@ created_at
 Gitea 선택 시: 배포 서버의 GitHub Webhook 처리(3.6절)는 Gitea 웹훅과 페이로드 형식이 거의 동일해
 (HMAC 서명 헤더만 `X-Gitea-Signature`) 코드 수정이 최소화됩니다.
 
+**구현 완료** — `platform/infra/gitea/`에 1차(Docker Compose)·2차(K8s manifests) 배포 산출물과
+웹훅·Keycloak SSO 연동 절차를 제공한다. 상세: `platform/infra/gitea/README.md`,
+[deployment-guide.md 3.8절](./deployment-guide.md).
+
 ### 10.3 스택 전체 라이선스 표
 
 | 구성 요소 | 도구 | 라이선스 | 판정 |

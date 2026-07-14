@@ -280,6 +280,14 @@ curl -X POST $BASE/projects/1/modules/1/bind -H "x-api-key: $ADMIN" \
 # 다음 배포부터 MAIL_URL, MAIL_API_KEY 자동 주입 → 코드에서 process.env/os.environ으로 사용
 ```
 
+### 3.8 사내 Git 서버 (기업용 — GitHub 대체)
+
+소스가 사외 SaaS로 나가면 안 되는 기업용 배포는 GitHub 대신 **사내 Gitea**를 쓴다.
+배포 산출물(1차 Docker Compose / 2차 K8s manifests)과 웹훅·SSO 연동 절차는
+[`platform/infra/gitea/README.md`](../platform/infra/gitea/README.md)에 정리되어 있다.
+플랫폼 코드는 GitHub·Gitea 웹훅 서명을 둘 다 자동 인식하므로(3.4절과 동일 절차),
+`git_url`만 사내 Gitea 주소로 바꾸면 이후 흐름은 동일하다.
+
 ---
 
 ## 4. 종합 예시 — 하이브리드 구성 한 장
