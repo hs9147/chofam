@@ -178,6 +178,18 @@ npm run build        # tsc 타입체크 + vite build → dist/
 - 의존성: react·react-dom·react-router-dom (전부 MIT). 라우팅은 해시 기반이라 새로고침·딥링크에
   백엔드 폴백이 필요 없습니다
 
+## 기업용 옵션 (14.2절 갭 구현)
+
+- **OIDC/RBAC (Keycloak 호환)**: `PAAS_OIDC_ISSUER` 설정 시 `Authorization: Bearer <JWT>`
+  인증 병행. `realm_access.roles`에 `PAAS_OIDC_ADMIN_ROLE`(기본 paas-admin)이 있으면 admin.
+- **비동기 배포**: `POST /projects/{id}/deploy`에 `"wait": false` → 202 즉시 반환,
+  `GET /projects/{id}/deployments`로 진행 폴링. 워커 수는 `PAAS_DEPLOY_WORKERS`(기본 2).
+- **OpenBao 시크릿**: `PAAS_OPENBAO_URL/TOKEN/KEY_PATH` 설정 시 Fernet 키를 KV v2에서 로드.
+- **멀티테넌시 격리**: `PAAS_K8S_ISOLATION=true` → 유닛별 NetworkPolicy
+  (ingress 컨트롤러 네임스페이스는 `PAAS_K8S_INGRESS_NAMESPACE`).
+- **외부 호출 재시도**: 토스·메일 호출은 네트워크 오류에 한해 3회 백오프 재시도
+  (HTTP 오류 응답은 재시도하지 않음 — 결제 중복 방지).
+
 ## DB 마이그레이션 (PostgreSQL 운영)
 
 SQLite 빠른 시작은 기동 시 자동 생성(create_all)으로 충분하다.

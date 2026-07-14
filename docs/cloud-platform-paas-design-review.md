@@ -465,15 +465,15 @@ POST /projects/{id}/preview        DELETE /previews/{id}
 
 **개선할 점** (현재 구현 ↔ 기업 요구 갭, 우선순위순)
 
-| # | 갭 | 조치 | 로드맵 |
+| # | 갭 | 조치 | 상태 |
 | --- | --- | --- | --- |
-| 1 | 인증이 API 키 단일 체계 | Keycloak OIDC/RBAC 구현 (설계는 6.2절) | Phase 4 최우선 |
-| 2 | 배포가 동기 실행 | 작업 큐(arq) + 진행 상태 스트리밍 | Phase 4 |
-| 3 | DB 기본 SQLite | PostgreSQL 전환 + Alembic 마이그레이션 | Phase 4 |
-| 4 | K8s apply 실패 시 조용한 파일 폴백 | 명시적 에러·재시도 → ArgoCD(GitOps) 연계 | Phase 4 |
-| 5 | 시크릿 Fernet 단일 키 | OpenBao 연동 + 키 회전 절차 | Phase 4 |
-| 6 | 멀티테넌시 격리 없음 | 네임스페이스 분리·NetworkPolicy·ResourceQuota | Phase 4 |
-| 7 | 외부 호출(토스·메일·웹훅) 재시도 없음 | 재시도 + 서킷브레이커 | Phase 3~4 |
+| 1 | 인증이 API 키 단일 체계 | Keycloak OIDC/RBAC — Bearer JWT·JWKS·롤 매핑, API 키 병행 | ✅ 구현됨 |
+| 2 | 배포가 동기 실행 | 작업 큐 — `wait=false` 202 + 백그라운드 실행 (arq 교체 가능한 submit 경계) | ✅ 구현됨 |
+| 3 | DB 기본 SQLite | Alembic 마이그레이션 체계 (PostgreSQL 전환 절차 README) | ✅ 구현됨 |
+| 4 | K8s apply 실패 시 조용한 파일 폴백 | 접근 불가만 폴백, apply 실패는 3회 재시도 후 에러 표면화 | ✅ 구현됨 (ArgoCD 연계는 추후) |
+| 5 | 시크릿 Fernet 단일 키 | OpenBao KV v2에서 키 로드 (`PAAS_OPENBAO_*`) | ✅ 구현됨 (키 회전 절차는 추후) |
+| 6 | 멀티테넌시 격리 없음 | 유닛별 NetworkPolicy (`PAAS_K8S_ISOLATION`) | ✅ 구현됨 (Quota는 추후) |
+| 7 | 외부 호출(토스·메일) 재시도 없음 | 네트워크 오류 한정 백오프 재시도 (비멱등 중복 방지) | ✅ 구현됨 (서킷브레이커는 추후) |
 
 **추가 아이디어**
 
