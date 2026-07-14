@@ -3,7 +3,7 @@
 const nodemailer = require('nodemailer');
 const { mailLogs, mailTemplates } = require('./firestore');
 
-const FROM_ADDRESS = process.env.MAIL_FROM_ADDRESS || 'hichofam@gmail.com';
+const FROM_ADDRESS = process.env.MAIL_FROM_ADDRESS || 'contact@cho-fam.com';
 
 const templateCache = new Map();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
