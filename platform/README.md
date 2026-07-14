@@ -178,6 +178,17 @@ npm run build        # tsc 타입체크 + vite build → dist/
 - 의존성: react·react-dom·react-router-dom (전부 MIT). 라우팅은 해시 기반이라 새로고침·딥링크에
   백엔드 폴백이 필요 없습니다
 
+## DB 마이그레이션 (PostgreSQL 운영)
+
+SQLite 빠른 시작은 기동 시 자동 생성(create_all)으로 충분하다.
+**PostgreSQL 운영 전환 시에는 Alembic으로 스키마를 관리**한다:
+
+```bash
+# 실행 위치: platform/
+PAAS_DATABASE_URL=postgresql://user:pw@host/paas python -m alembic upgrade head
+# 모델 변경 후 새 리비전: python -m alembic revision --autogenerate -m "설명"
+```
+
 ## 테스트
 
 ```bash
