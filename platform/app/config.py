@@ -76,6 +76,13 @@ class Settings(BaseSettings):
     # 멀티테넌시 격리(갭6): 유닛별 NetworkPolicy 생성 — ingress 컨트롤러·동일 네임스페이스만 허용
     k8s_isolation: bool = False
     k8s_ingress_namespace: str = "traefik"  # ingress 컨트롤러가 사는 네임스페이스
+    # GitOps(ArgoCD) 연계: 설정 시 직접 apply 대신 매니페스트를 이 리포에 커밋·푸시
+    k8s_gitops_repo: str = ""  # 예: git@git.example.com:org/paas-apps.git
+    k8s_gitops_branch: str = "main"
+    k8s_gitops_path: str = "apps"  # 리포 내 매니페스트 디렉토리
+    # 네임스페이스 ResourceQuota (빈 값이면 미생성)
+    k8s_quota_cpu: str = ""  # 예: "20"
+    k8s_quota_memory: str = ""  # 예: "64Gi"
     # kubernetes 패키지가 없거나 apply 권한이 없을 때 매니페스트를 내려쓸 위치
     k8s_manifest_dir: Path = Path("./data/k8s-manifests")
 
