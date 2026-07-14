@@ -14,14 +14,35 @@ from .models import ApiKey
 _fernet: Fernet | None = None
 
 
+def _load_key_from_openbao() -> str:
+    """OpenBao KV v2에서 Fernet 키 로드 (갭5). 실패는 명확한 에러 — 임시 키 침묵 생성 금지."""
+    import httpx  # noqa: PLC0415
+
+    settings = get_settings()
+    url = f"{settings.openbao_url.rstrip('/')}/v1/{settings.openbao_key_path.strip('/')}"
+    try:
+        res = httpx.get(url, headers={"X-Vault-Token": settings.openbao_token}, timeout=10)
+    except Exception as e:
+        raise RuntimeError(f"OpenBao 연결 실패: {e}") from e
+    if res.status_code != 200:
+        raise RuntimeError(f"OpenBao 키 조회 실패 (HTTP {res.status_code}): {settings.openbao_key_path}")
+    key = res.json().get("data", {}).get("data", {}).get("key", "")
+    if not key:
+        raise RuntimeError(f"OpenBao 응답에 data.data.key 없음: {settings.openbao_key_path}")
+    return key
+
+
 def get_fernet() -> Fernet:
     global _fernet
     if _fernet is None:
         settings = get_settings()
-        key = settings.fernet_key
-        if not key:
-            # 운영에서는 반드시 PAAS_FERNET_KEY를 고정할 것 — 미설정 시 재기동마다 복호화 불가
-            key = Fernet.generate_key().decode()
+        if settings.openbao_url:
+            key = _load_key_from_openbao()
+        else:
+            key = settings.fernet_key
+            if not key:
+                # 운영에서는 PAAS_FERNET_KEY 고정 또는 OpenBao 사용 — 미설정 시 재기동마다 복호화 불가
+                key = Fernet.generate_key().decode()
         _fernet = Fernet(key.encode() if isinstance(key, str) else key)
     return _fernet
 
