@@ -93,6 +93,10 @@ class Settings(BaseSettings):
     # 웹훅 서명 검증용 공유 시크릿 (GitHub/Gitea 웹훅 설정에 동일 값 입력)
     webhook_secret: str = ""
 
+    # 사내 Git 서버(Gitea 등) 기본 URL — 콘솔에 "Git" 메뉴를 노출하는 용도로만 쓰인다
+    # (배포 동작에는 영향 없음, git_url은 프로젝트별로 여전히 개별 지정). infra/gitea/ 참고.
+    gitea_url: str = ""
+
     # release 빌드 기본 리소스 (development는 build.py의 프로필 정의가 절반 수준으로 축소)
     default_memory_limit: str = "1g"
     default_cpu_limit: float = 1.0

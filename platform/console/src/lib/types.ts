@@ -129,6 +129,7 @@ export interface HealthInfo {
   tier: string;
   host_os: string;
   features: string[];
+  gitea_url: string | null;
 }
 
 export interface PaymentOut {

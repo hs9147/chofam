@@ -18,11 +18,13 @@ def health():
     from ..features import enabled_features  # noqa: PLC0415
     from ..services.host import get_host_caps  # noqa: PLC0415
 
+    settings = get_settings()
     return {
         "ok": True,
-        "tier": get_settings().tier,
+        "tier": settings.tier,
         "host_os": get_host_caps().os,
         "features": sorted(enabled_features()),
+        "gitea_url": settings.gitea_url or None,
     }
 
 

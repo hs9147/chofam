@@ -5,6 +5,7 @@ import { isAdmin, isLoggedIn } from './lib/auth';
 import Audit from './pages/Audit';
 import Chat from './pages/Chat';
 import Dashboard from './pages/Dashboard';
+import Git from './pages/Git';
 import Login from './pages/Login';
 import Modules from './pages/Modules';
 import Payments from './pages/Payments';
@@ -48,6 +49,7 @@ export default function App() {
           }
         />
         <Route path="/projects" element={<Projects />} />
+        <Route path="/git" element={<Git />} />
         <Route path="/projects/:id" element={<ProjectDetail />}>
           <Route index element={<Navigate to="overview" replace />} />
           <Route path="overview" element={<OverviewTab />} />

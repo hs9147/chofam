@@ -18,6 +18,7 @@ export default function Layout() {
         <nav>
           {admin && <NavLink to="/">대시보드</NavLink>}
           <NavLink to="/projects">프로젝트</NavLink>
+          {health.data?.gitea_url && <NavLink to="/git">Git</NavLink>}
           <NavLink to="/modules">모듈</NavLink>
           {has('workspace') && <NavLink to="/providers">LLM</NavLink>}
           {has('workspace') && <NavLink to="/chat">채팅</NavLink>}
