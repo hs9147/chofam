@@ -34,6 +34,20 @@ from ..services import workspace
 router = APIRouter(tags=["llm"])
 
 
+def _require_admin_for_external(provider: LlmProvider, key: ApiKey) -> None:
+    """외부 LLM 프로바이더 사용은 admin 키만 허용한다.
+
+    일반 키가 임의 project_id + 임의 provider_id를 조합해 아무 프로젝트의
+    소스를 외부로 보낼 수 있는 경로를 막는다. internal 프로바이더(project://)는
+    사내망을 벗어나지 않으므로 일반 키에도 열어둔다.
+    """
+    if provider.kind == LlmProviderKind.external and not key.is_admin:
+        raise HTTPException(
+            status_code=403,
+            detail="외부 LLM 프로바이더는 admin 키만 사용할 수 있습니다.",
+        )
+
+
 def _provider_out(p: LlmProvider) -> LlmProviderOut:
     return LlmProviderOut(
         id=p.id, name=p.name, kind=p.kind.value, base_url=p.base_url,
@@ -78,6 +92,7 @@ def create_session(
     provider = db.get(LlmProvider, body.provider_id)
     if project is None or provider is None:
         raise HTTPException(status_code=404, detail="project or provider not found")
+    _require_admin_for_external(provider, key)
     session = ChatSession(project_id=project.id, provider_id=provider.id, branch="")
     db.add(session)
     db.commit()
@@ -195,6 +210,7 @@ async def review_project(
     provider = db.get(LlmProvider, body.provider_id)
     if project is None or provider is None:
         raise HTTPException(status_code=404, detail="project or provider not found")
+    _require_admin_for_external(provider, key)
 
     diff = body.diff
     if diff is None:

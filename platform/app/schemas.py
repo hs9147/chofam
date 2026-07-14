@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from .models import BuildProfile, DeploymentStatus, ProjectType
 
@@ -63,9 +63,21 @@ class EnvVarSet(BaseModel):
 class LlmProviderCreate(BaseModel):
     name: str
     kind: str = Field(pattern=r"^(external|internal)$")
-    base_url: str  # internal은 project://<프로젝트명> 허용
+    base_url: str  # internal은 project://<프로젝트명> 형식만 허용 (아래 검증)
     api_key: str | None = None
     model: str
+
+    @model_validator(mode="after")
+    def _internal_must_use_project_scheme(self) -> "LlmProviderCreate":
+        # kind="internal"은 "소스가 사외로 나가지 않는다"는 보장의 근거다.
+        # base_url을 자유 문자열로 두면 라벨만 internal이고 실제로는 외부 URL을
+        # 가리키는 설정 실수(또는 악용)를 코드가 전혀 막지 못한다 — 여기서 강제한다.
+        if self.kind == "internal" and not self.base_url.startswith("project://"):
+            raise ValueError(
+                "internal 프로바이더는 base_url이 'project://<프로젝트명>' 형식이어야 합니다 "
+                "(외부 URL을 쓰려면 kind를 external로 등록하세요)"
+            )
+        return self
 
 
 class LlmProviderOut(BaseModel):

@@ -35,6 +35,70 @@ def test_provider_key_never_exposed():
     assert "sk-secret" not in str(listing)
 
 
+def test_internal_provider_must_use_project_scheme():
+    """보안수정 — kind=internal인데 base_url이 외부 URL이면 등록 자체를 거부한다."""
+    c = _client()
+    r = c.post("/llm/providers", json={
+        "name": "fake-internal", "kind": "internal",
+        "base_url": "https://api.some-external-llm.com", "model": "m",
+    }, headers=ADMIN)
+    assert r.status_code == 422
+    assert "project://" in r.text
+
+
+def test_internal_provider_with_project_scheme_succeeds():
+    c = _client()
+    r = c.post("/llm/providers", json={
+        "name": "llm-main", "kind": "internal", "base_url": "project://llm-main", "model": "m",
+    }, headers=ADMIN)
+    assert r.status_code == 201
+
+
+def _member_key(c: TestClient, name="dev1") -> dict:
+    key = c.post("/keys", json={"name": name}, headers=ADMIN).json()["key"]
+    return {"x-api-key": key}
+
+
+def test_non_admin_key_blocked_from_external_provider_session():
+    c = _client()
+    pid = _create_project(c)
+    prov = _create_provider(c)  # external
+    r = c.post("/chat/sessions", json={"project_id": pid, "provider_id": prov},
+               headers=_member_key(c))
+    assert r.status_code == 403
+    assert "admin" in r.text
+
+
+def test_non_admin_key_allowed_for_internal_provider_session():
+    c = _client()
+    pid = _create_project(c)
+    prov_id = c.post("/llm/providers", json={
+        "name": "llm-internal", "kind": "internal", "base_url": "project://llm-internal",
+        "model": "m",
+    }, headers=ADMIN).json()["id"]
+    r = c.post("/chat/sessions", json={"project_id": pid, "provider_id": prov_id},
+               headers=_member_key(c))
+    assert r.status_code == 200
+
+
+def test_non_admin_key_blocked_from_external_review():
+    c = _client()
+    pid = _create_project(c)
+    prov = _create_provider(c)  # external
+    r = c.post(f"/projects/{pid}/review",
+               json={"provider_id": prov, "diff": "--- a/x\n+++ b/x\n"},
+               headers=_member_key(c))
+    assert r.status_code == 403
+
+
+def test_admin_key_still_allowed_for_external_session():
+    c = _client()
+    pid = _create_project(c)
+    prov = _create_provider(c)
+    r = c.post("/chat/sessions", json={"project_id": pid, "provider_id": prov}, headers=ADMIN)
+    assert r.status_code == 200
+
+
 def test_chat_message_creates_proposed_change(monkeypatch):
     reply = "수정했습니다.\n```diff\n--- a/m.py\n+++ b/m.py\n@@ -1 +1 @@\n-x\n+y\n```"
     monkeypatch.setattr(

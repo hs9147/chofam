@@ -197,6 +197,26 @@ npm run build        # tsc 타입체크 + vite build → dist/
 - **네임스페이스 Quota**: `PAAS_K8S_QUOTA_CPU`/`_MEMORY` 설정 시 ResourceQuota +
   기본 LimitRange 매니페스트 생성.
 
+## 플랫폼 내 Git 구현
+
+플랫폼은 **자체 리포(chofam)와는 무관하게**, 배포 대상 프로젝트마다 독립된 로컬 git 체크아웃을
+`work_dir`(기본 `./data/workspaces/{project}`) 아래 두고 조작한다. 전부 `subprocess`로 시스템 git을
+호출하며(플랫폼 자체 git 라이브러리 없음), 외부로 나가는 지점은 웹훅 수신과 GitOps 푸시 둘뿐이다.
+
+| 컴포넌트 | 파일 | 동작 |
+| --- | --- | --- |
+| **배포 체크아웃** | `services/build.py` `checkout()` | 최초엔 `git clone --branch`, 이후는 `fetch`+`reset --hard`로 매 배포마다 최신화. `git_sha` 지정 시 해당 커밋으로 `checkout`. **읽기 전용** — 이 리포에 커밋하지 않음 |
+| **웹훅 자동 배포** | `api/webhooks.py` | GitHub/Gitea push 이벤트를 **수신**(HMAC 서명 검증 필수)해 위 checkout→build 파이프라인을 트리거. 플랫폼이 밖으로 나가는 방향이 아니라 받는 방향 |
+| **코드 워크스페이스(채팅 편집)** | `services/workspace.py` | LLM이 제안한 diff를 `git apply` 후 작업 브랜치(`paas/chat-{id}`)에 **로컬 커밋만** 한다(`ensure_branch`, `apply_diff`). **자동 push 없음** — 승인(`/changes/{id}/apply`)해도 원격에 반영되지 않고, 실제 배포(release/development)를 실행해야 그 브랜치가 빌드된다 |
+| **GitOps 연계** | `services/runtime/k8s_runtime.py` `_gitops_push`/`_sync_gitops_repo` | 2차(K8s) 티어에서 `PAAS_K8S_GITOPS_REPO` 설정 시에만 활성화. 배포 **매니페스트**(이미지 태그·비-시크릿 env)를 별도 GitOps 리포에 커밋·푸시해 ArgoCD가 반영하게 한다. **시크릿은 여기 포함되지 않음**(15절) — 애초에 소스 코드가 아니라 K8s 매니페스트만 다루는 경로 |
+| **프리뷰** | `services/preview.py` | 위 checkout 재사용, 별도 git 조작 없음 |
+
+**핵심 경계선**: 프로젝트 소스 코드 자체가 플랫폼 밖의 git 리포로 나가는 경로는 없다
+(체크아웃은 읽기 전용, 채팅 편집은 로컬 커밋만). 외부로 실제 전송되는 것은 두 가지뿐이다 —
+① LLM 채팅 시 파일 **내용**이 API 호출로 프로바이더에 전송(어느 프로바이더인지는 12절/15절의
+internal·external 구분과 admin 게이트로 통제), ② GitOps 모드에서 배포 **매니페스트**(소스 아님)가
+운영자가 지정한 리포로 푸시.
+
 ## DB 마이그레이션 (PostgreSQL 운영)
 
 SQLite 빠른 시작은 기동 시 자동 생성(create_all)으로 충분하다.
@@ -211,7 +231,7 @@ PAAS_DATABASE_URL=postgresql://user:pw@host/paas python -m alembic upgrade head
 ## 테스트
 
 ```bash
-cd platform && python -m pytest tests/ -q   # 39 passed
+cd platform && python -m pytest tests/ -q   # 107 passed
 ```
 
 Docker/K8s 미설치 환경에서도 컨트롤 플레인·매니페스트 생성·프로필 로직이 검증됩니다.

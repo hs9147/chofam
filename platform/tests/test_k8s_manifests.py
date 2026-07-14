@@ -76,3 +76,33 @@ def test_isolation_off_by_default(fresh_settings):
     get_settings.cache_clear()
     manifests = build_manifests(_spec(BuildProfile.release))
     assert len(manifests) == 3
+
+
+def test_secret_keys_split_into_separate_secret_object():
+    """시크릿 정보 유출 방지 — secret_keys에 해당하는 env는 Deployment에 평문으로
+    들어가지 않고 별도 Secret 오브젝트(stringData)로 분리되어야 한다."""
+    spec = _spec(BuildProfile.release)
+    spec.env = {"APP_ENV": "production", "DB_PASSWORD": "s3cr3t", "PUBLIC_URL": "https://x"}
+    spec.secret_keys = frozenset({"DB_PASSWORD"})
+
+    manifests = build_manifests(spec)
+    kinds = [m["kind"] for m in manifests]
+    assert kinds == ["Secret", "Deployment", "Service", "Ingress"]
+
+    secret = manifests[0]
+    assert secret["metadata"]["name"] == "paas-shop-secrets"
+    assert secret["stringData"] == {"DB_PASSWORD": "s3cr3t"}
+
+    dep = manifests[1]
+    container = dep["spec"]["template"]["spec"]["containers"][0]
+    env_names = {e["name"] for e in container["env"]}
+    assert "DB_PASSWORD" not in env_names
+    assert env_names == {"APP_ENV", "PUBLIC_URL"}
+    assert container["envFrom"] == [{"secretRef": {"name": "paas-shop-secrets"}}]
+
+
+def test_no_secret_object_when_no_secret_keys():
+    manifests = build_manifests(_spec(BuildProfile.release))
+    assert "Secret" not in [m["kind"] for m in manifests]
+    container = manifests[0]["spec"]["template"]["spec"]["containers"][0]
+    assert "envFrom" not in container

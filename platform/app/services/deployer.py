@@ -43,6 +43,24 @@ def resolve_env(db: Session, project: Project, profile: BuildProfile) -> dict[st
     return env
 
 
+def secret_env_keys(db: Session, project: Project) -> frozenset[str]:
+    """민감 env 키 이름 집합 — K8s 매니페스트에서 Secret으로 분리하는 기준.
+
+    EnvVar.is_secret=True 행 + module 바인딩이 주입하는 *_API_KEY/*_DSN
+    (modules.SENSITIVE_KEYS 규약, `binding_env`가 생성하는 이름과 동일).
+    """
+    rows = db.execute(
+        select(EnvVar.key).where(EnvVar.project_id == project.id, EnvVar.is_secret.is_(True))
+    ).scalars()
+    keys = set(rows)
+    from . import modules  # noqa: PLC0415 — 순환 import 회피
+
+    keys.update(
+        k for k in modules.env_for_project(db, project) if k.endswith(("_API_KEY", "_DSN"))
+    )
+    return frozenset(keys)
+
+
 def make_spec(
     db: Session, project: Project, image_tag: str, profile: BuildProfile
 ) -> RuntimeSpec:
@@ -56,6 +74,7 @@ def make_spec(
         profile=profile,
         domain=proxy.domain_for(project.name, project.domain, profile),
         env=resolve_env(db, project, profile),
+        secret_keys=secret_env_keys(db, project),
         memory_limit=project.memory_limit or settings.default_memory_limit,
         cpu_limit=project.cpu_limit or settings.default_cpu_limit,
         replicas=PROFILES[profile].replicas,

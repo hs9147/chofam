@@ -19,6 +19,10 @@ class RuntimeSpec:
     profile: BuildProfile
     domain: str
     env: dict[str, str] = field(default_factory=dict)
+    # env 중 프로젝트 EnvVar(is_secret=True)에서 온 키 — K8s 런타임이 이 값을
+    # 일반 매니페스트(특히 GitOps로 외부 git에 커밋되는 파일)에 평문으로 넣지 않고
+    # 별도 Secret으로 분리하는 기준이 된다.
+    secret_keys: frozenset[str] = field(default_factory=frozenset)
     memory_limit: str = "1g"
     cpu_limit: float = 1.0
     replicas: int = 1

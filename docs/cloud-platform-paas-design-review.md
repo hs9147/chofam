@@ -482,3 +482,23 @@ POST /projects/{id}/preview        DELETE /previews/{id}
 - GPU 예약제: VRAM 사전 검사(3.5절) + 시간대별 GPU 공유 스케줄
 - 사내 표준 스캐폴드: 조직 표준 Dockerfile·CI 포함 프로젝트 생성기
 - DR 자동화: DB·Fernet 키 백업 + 복구 리허설, 헬스체크 기반 상태 페이지 자동 생성
+
+---
+
+## 15. 데이터 유출 보안 점검 및 조치
+
+"자료가 외부로 유출되지 않는가"를 코드 레벨(리포 공개 설정이 아니라 실제 네트워크 전송 경로)로
+점검했다. GitHub 리포(`hs9147/chofam`)는 private로 확인됨. 코드 감사에서 발견된 실질적 위험
+3건은 전부 수정 완료했다.
+
+| # | 위험 | 조치 | 파일 |
+| --- | --- | --- | --- |
+| 1 | GitOps 매니페스트에 프로젝트 시크릿(EnvVar·Module `*_API_KEY`/`*_DSN`)이 평문으로 포함되어 admin이 설정한 외부 git 리포에 그대로 커밋·푸시됨 — 키 회전 후에도 과거 커밋에 영구히 남음 | `RuntimeSpec.secret_keys`로 시크릿 키를 별도 추적, K8s 매니페스트에서 `Secret`(stringData) 오브젝트로 분리. **GitOps 푸시에서는 Secret을 완전히 제외**하고 로컬 전용 파일(`{unit}-secrets.local.yaml`, git 미대상)에만 기록 — 클러스터 반영은 운영자가 별도 채널(kubectl apply, External Secrets Operator 등)로 수행 | `services/deployer.py`(`secret_env_keys`), `services/runtime/base.py`, `services/runtime/k8s_runtime.py` |
+| 2 | `LlmProviderKind.internal`이 라벨일 뿐 코드로 강제되지 않음 — admin이 실수로 `kind=internal` + 외부 URL을 등록해도 그대로 통과, "소스가 사외로 나가지 않는다"는 12절 주장이 코드로 보장되지 않음 | `LlmProviderCreate`에 `model_validator` 추가: `kind=internal`이면 `base_url`이 반드시 `project://`로 시작해야 등록 허용(그 외 422 거부) | `app/schemas.py` |
+| 3 | 채팅/리뷰 API가 `require_api_key`(비관리자 포함 전체 키)로만 보호되어, 일반 키 하나로 임의 프로젝트 + 임의(외부 포함) 프로바이더를 조합해 소스를 외부 LLM으로 보낼 수 있었음 | 세션 생성(`/chat/sessions`)·리뷰(`/projects/{id}/review`) 시점에 provider가 `external`이면 admin 키만 허용(403). `internal` 프로바이더는 계속 일반 키에 열어둠(사내망을 벗어나지 않으므로) | `app/api/llm.py`(`_require_admin_for_external`) |
+
+부수 하우스키핑: 실수로 커밋된 `platform/delete.txt`(pip freeze 덤프) 제거, 루트·`platform/.gitignore`에
+`.pytest_cache/` 추가.
+
+검증: pytest 107건 통과(신규 10건 — Secret 분리·GitOps 히스토리 무유출·internal 스킴 강제·
+admin 게이트 4종), 콘솔 `tsc`+`vite build`+vitest 통과.

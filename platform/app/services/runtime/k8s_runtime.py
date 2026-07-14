@@ -75,11 +75,16 @@ def build_manifests(spec: RuntimeSpec) -> list[dict]:
     if spec.gpu:
         resources["limits"]["nvidia.com/gpu"] = 1
 
+    # 시크릿(spec.secret_keys)은 일반 env로 매니페스트에 평문으로 넣지 않고
+    # 별도 Secret 오브젝트로 분리한다 — GitOps 모드에서 외부 git에 평문 커밋되는 것을 막기 위함.
+    plain_env = {k: v for k, v in spec.env.items() if k not in spec.secret_keys}
+    secret_env = {k: v for k, v in spec.env.items() if k in spec.secret_keys}
+
     container = {
         "name": "app",
         "image": image,
         "ports": [{"containerPort": spec.internal_port}],
-        "env": [{"name": k, "value": v} for k, v in sorted(spec.env.items())],
+        "env": [{"name": k, "value": v} for k, v in sorted(plain_env.items())],
         "resources": resources,
         "readinessProbe": {
             "httpGet": {"path": spec.health_check_path, "port": spec.internal_port},
@@ -87,6 +92,8 @@ def build_manifests(spec: RuntimeSpec) -> list[dict]:
             "periodSeconds": 10,
         },
     }
+    if secret_env:
+        container["envFrom"] = [{"secretRef": {"name": f"{name}-secrets"}}]
 
     deployment = {
         "apiVersion": "apps/v1",
@@ -147,7 +154,16 @@ def build_manifests(spec: RuntimeSpec) -> list[dict]:
             }],
         },
     }
-    manifests = [deployment, service, ingress]
+    manifests: list[dict] = []
+    if secret_env:
+        manifests.append({
+            "apiVersion": "v1",
+            "kind": "Secret",
+            "metadata": {"name": f"{name}-secrets", "namespace": ns, "labels": labels},
+            "type": "Opaque",
+            "stringData": dict(sorted(secret_env.items())),
+        })
+    manifests += [deployment, service, ingress]
 
     if settings.k8s_isolation:
         # 갭6 — 유닛별 기본 차단 NetworkPolicy: ingress 컨트롤러 네임스페이스와
@@ -244,7 +260,17 @@ class K8sRuntime(Runtime):
     # --- GitOps(ArgoCD) 연계 ---
 
     def _gitops_push(self, spec: RuntimeSpec, manifests: list[dict]) -> None:
+        """매니페스트를 GitOps 리포에 커밋·푸시한다.
+
+        Secret 오브젝트는 절대 여기 포함하지 않는다 — 외부 git 리포 히스토리에
+        평문(stringData) 시크릿이 영구히 남는 것을 막기 위함. Secret은
+        _write_local_secrets()로 로컬 전용 파일에만 쓰고, 클러스터 적용은
+        운영자가 별도 채널(kubectl apply, External Secrets Operator 등)로 수행한다.
+        """
         settings = get_settings()
+        git_manifests = [m for m in manifests if m.get("kind") != "Secret"]
+        secret_manifests = [m for m in manifests if m.get("kind") == "Secret"]
+
         repo_dir = self._sync_gitops_repo()
         target_dir = repo_dir / settings.k8s_gitops_path
         target_dir.mkdir(parents=True, exist_ok=True)
@@ -253,9 +279,11 @@ class K8sRuntime(Runtime):
             encoding="utf-8",
         )
         (target_dir / f"{spec.unit_name}.yaml").write_text(
-            yaml.safe_dump_all(manifests, sort_keys=False, allow_unicode=True),
+            yaml.safe_dump_all(git_manifests, sort_keys=False, allow_unicode=True),
             encoding="utf-8",
         )
+        if secret_manifests:
+            self._write_local_secrets(spec, secret_manifests)
         _gitops_git(repo_dir, "add", "-A")
         status = subprocess.run(
             ["git", "status", "--porcelain"], cwd=repo_dir, capture_output=True, text=True
@@ -363,6 +391,19 @@ class K8sRuntime(Runtime):
         raise K8sApplyError(
             f"K8s apply 실패 (3회 재시도 후): {str(last_error)[:500]}"
         )
+
+    def _write_local_secrets(self, spec: RuntimeSpec, secret_manifests: list[dict]) -> Path:
+        """Secret 매니페스트 전용 로컬 파일. git 리포(GitOps)에는 절대 커밋되지 않는다.
+
+        운영자가 kubectl apply -f 또는 External Secrets Operator/OpenBao 연동으로
+        클러스터에 직접 반영해야 한다.
+        """
+        out = get_settings().k8s_manifest_dir / f"{spec.unit_name}-secrets.local.yaml"
+        out.write_text(
+            yaml.safe_dump_all(secret_manifests, sort_keys=False, allow_unicode=True),
+            encoding="utf-8",
+        )
+        return out
 
     def _write_manifests(self, spec: RuntimeSpec, manifests: list[dict]) -> Path:
         out = get_settings().k8s_manifest_dir / f"{spec.unit_name}.yaml"
