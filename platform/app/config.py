@@ -73,6 +73,9 @@ class Settings(BaseSettings):
     k8s_registry: str = ""  # 예: harbor.example.com/paas — 빈 값이면 로컬 이미지명 사용
     k8s_ingress_class: str = "traefik"
     k8s_cluster_issuer: str = "letsencrypt"  # cert-manager ClusterIssuer
+    # 멀티테넌시 격리(갭6): 유닛별 NetworkPolicy 생성 — ingress 컨트롤러·동일 네임스페이스만 허용
+    k8s_isolation: bool = False
+    k8s_ingress_namespace: str = "traefik"  # ingress 컨트롤러가 사는 네임스페이스
     # kubernetes 패키지가 없거나 apply 권한이 없을 때 매니페스트를 내려쓸 위치
     k8s_manifest_dir: Path = Path("./data/k8s-manifests")
 

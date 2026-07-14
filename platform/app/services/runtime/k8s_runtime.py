@@ -142,7 +142,36 @@ def build_manifests(spec: RuntimeSpec) -> list[dict]:
             }],
         },
     }
-    return [deployment, service, ingress]
+    manifests = [deployment, service, ingress]
+
+    if settings.k8s_isolation:
+        # 갭6 — 유닛별 기본 차단 NetworkPolicy: ingress 컨트롤러 네임스페이스와
+        # 동일 네임스페이스(사이드카·헬스체크)에서 오는 트래픽만 허용
+        network_policy = {
+            "apiVersion": "networking.k8s.io/v1",
+            "kind": "NetworkPolicy",
+            "metadata": {"name": name, "namespace": ns, "labels": labels},
+            "spec": {
+                "podSelector": {"matchLabels": {
+                    "app.kubernetes.io/name": spec.project_name,
+                    "paas/profile": spec.profile.value,
+                }},
+                "policyTypes": ["Ingress"],
+                "ingress": [{
+                    "from": [
+                        {"namespaceSelector": {"matchLabels": {
+                            "kubernetes.io/metadata.name": settings.k8s_ingress_namespace,
+                        }}},
+                        {"namespaceSelector": {"matchLabels": {
+                            "kubernetes.io/metadata.name": ns,
+                        }}},
+                    ],
+                }],
+            },
+        }
+        manifests.append(network_policy)
+
+    return manifests
 
 
 class K8sRuntime(Runtime):

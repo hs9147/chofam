@@ -48,3 +48,31 @@ def test_gpu_request():
     dep, _, _ = build_manifests(spec)
     limits = dep["spec"]["template"]["spec"]["containers"][0]["resources"]["limits"]
     assert limits["nvidia.com/gpu"] == 1
+
+
+def test_isolation_adds_network_policy(monkeypatch, fresh_settings):
+    """갭6 — k8s_isolation 시 유닛별 NetworkPolicy가 추가된다."""
+    monkeypatch.setenv("PAAS_K8S_ISOLATION", "true")
+    monkeypatch.setenv("PAAS_K8S_INGRESS_NAMESPACE", "traefik")
+    from app.config import get_settings
+
+    get_settings.cache_clear()
+    manifests = build_manifests(_spec(BuildProfile.release))
+    assert [m["kind"] for m in manifests] == [
+        "Deployment", "Service", "Ingress", "NetworkPolicy",
+    ]
+    np = manifests[3]
+    assert np["spec"]["podSelector"]["matchLabels"]["app.kubernetes.io/name"] == "shop"
+    allowed = [
+        f["namespaceSelector"]["matchLabels"]["kubernetes.io/metadata.name"]
+        for f in np["spec"]["ingress"][0]["from"]
+    ]
+    assert allowed == ["traefik", "paas-apps"]
+
+
+def test_isolation_off_by_default(fresh_settings):
+    from app.config import get_settings
+
+    get_settings.cache_clear()
+    manifests = build_manifests(_spec(BuildProfile.release))
+    assert len(manifests) == 3
