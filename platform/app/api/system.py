@@ -5,9 +5,9 @@ from sqlalchemy.orm import Session
 from .. import audit
 from ..config import get_settings
 from ..db import get_db
-from ..models import ApiKey, AuditEvent
+from ..models import ApiKey, AuditEvent, EnvVar, LlmProvider, Module
 from ..schemas import ApiKeyCreate, ApiKeyIssued
-from ..security import hash_key, issue_key, require_admin
+from ..security import hash_key, issue_key, require_admin, rotate_token
 from ..services import monitor
 
 router = APIRouter(tags=["system"])
@@ -42,6 +42,39 @@ def create_key(
     db.commit()
     audit.record(db, admin.name, "key.issue", body.name, {"is_admin": body.is_admin})
     return ApiKeyIssued(name=body.name, key=raw, is_admin=body.is_admin)
+
+
+@router.post("/admin/rotate-secrets")
+def rotate_secrets(
+    db: Session = Depends(get_db),
+    admin: ApiKey = Depends(require_admin),
+):
+    """키 회전(후속2): 저장된 모든 암호문을 현행 Fernet 키로 재암호화.
+
+    절차: 새 키를 PAAS_FERNET_KEY로, 기존 키를 PAAS_FERNET_KEYS_OLD로 옮겨 재기동한 뒤
+    이 엔드포인트를 호출하고, 완료 후 구 키를 제거한다.
+    """
+    rotated = 0
+    for row in db.execute(select(EnvVar)).scalars():
+        row.value_encrypted = rotate_token(row.value_encrypted)
+        rotated += 1
+    for provider in db.execute(select(LlmProvider)).scalars():
+        if provider.api_key_encrypted:
+            provider.api_key_encrypted = rotate_token(provider.api_key_encrypted)
+            rotated += 1
+    for module in db.execute(select(Module)).scalars():
+        config = dict(module.config or {})
+        changed = False
+        for k, v in config.items():
+            if isinstance(v, dict) and "__enc__" in v:
+                config[k] = {"__enc__": rotate_token(v["__enc__"])}
+                changed = True
+                rotated += 1
+        if changed:
+            module.config = config
+    db.commit()
+    audit.record(db, admin.name, "secrets.rotate", "all", {"rotated": rotated})
+    return {"rotated": rotated}
 
 
 @router.get("/audit")

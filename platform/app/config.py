@@ -57,6 +57,10 @@ class Settings(BaseSettings):
     admin_api_key: str = ""
     # EnvVar 암호화용 Fernet 키(urlsafe base64 32byte). 미설정 시 개발용 키를 생성한다.
     fernet_key: str = ""
+    # 키 회전용 구(舊) 키 목록(콤마 구분) — 복호화에만 사용, 암호화는 fernet_key로.
+    # 회전 절차: 새 키 발급 → fernet_key 교체 + 기존 키를 여기로 이동 →
+    # POST /admin/rotate-secrets 로 전체 재암호화 → 구 키 제거.
+    fernet_keys_old: str = ""
 
     # Git 작업 디렉토리 / 빌드 로그 저장소
     work_dir: Path = Path("./data/workspaces")

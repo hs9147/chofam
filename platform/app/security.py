@@ -2,7 +2,7 @@ import hashlib
 import hmac
 import secrets
 
-from cryptography.fernet import Fernet
+from cryptography.fernet import Fernet, MultiFernet
 from fastapi import Depends, Header, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -32,7 +32,8 @@ def _load_key_from_openbao() -> str:
     return key
 
 
-def get_fernet() -> Fernet:
+def get_fernet() -> MultiFernet:
+    """암호화는 첫 키(현행), 복호화는 구 키까지 시도 — 키 회전(후속2) 지원."""
     global _fernet
     if _fernet is None:
         settings = get_settings()
@@ -43,8 +44,18 @@ def get_fernet() -> Fernet:
             if not key:
                 # 운영에서는 PAAS_FERNET_KEY 고정 또는 OpenBao 사용 — 미설정 시 재기동마다 복호화 불가
                 key = Fernet.generate_key().decode()
-        _fernet = Fernet(key.encode() if isinstance(key, str) else key)
+        keys = [Fernet(key.encode())]
+        for old in settings.fernet_keys_old.split(","):
+            old = old.strip()
+            if old:
+                keys.append(Fernet(old.encode()))
+        _fernet = MultiFernet(keys)
     return _fernet
+
+
+def rotate_token(token: str) -> str:
+    """구 키로 암호화된 토큰을 현행 키로 재암호화."""
+    return get_fernet().rotate(token.encode()).decode()
 
 
 def encrypt_value(plain: str) -> str:
