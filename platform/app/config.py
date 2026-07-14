@@ -36,6 +36,20 @@ class Settings(BaseSettings):
     toss_secret_key: str = ""
     toss_api_base: str = "https://api.tosspayments.com"
 
+    # --- OIDC/RBAC (Keycloak 호환, 선택 — API 키 체계와 병행) ---
+    oidc_issuer: str = ""  # 예: https://sso.example.com/realms/company
+    oidc_audience: str = ""  # 비우면 audience 검증 생략
+    oidc_jwks_url: str = ""  # 비우면 {issuer}/protocol/openid-connect/certs (Keycloak 규약)
+    oidc_admin_role: str = "paas-admin"  # realm_access.roles에 이 롤이 있으면 admin
+
+    # --- 배포 작업 큐 ---
+    deploy_workers: int = 2
+
+    # --- OpenBao 시크릿 (선택 — 설정 시 Fernet 키를 KV v2에서 로드) ---
+    openbao_url: str = ""  # 예: https://bao.example.com
+    openbao_token: str = ""
+    openbao_key_path: str = "secret/data/paas/fernet"  # data.data.key 에 Fernet 키 저장
+
     database_url: str = "sqlite:///./paas.db"
     base_domain: str = "deploy.localhost"
 

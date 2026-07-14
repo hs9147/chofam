@@ -51,11 +51,58 @@ def verify_webhook_signature(secret: str, body: bytes, signature: str) -> bool:
     return hmac.compare_digest(expected, received)
 
 
+# --- OIDC (Keycloak 호환) — Bearer JWT 검증. API 키 체계와 병행 ---
+
+_jwk_client = None  # PyJWKClient — JWKS 캐시 내장
+
+
+def _get_jwk_client():
+    global _jwk_client
+    if _jwk_client is None:
+        import jwt  # noqa: PLC0415
+
+        settings = get_settings()
+        jwks_url = settings.oidc_jwks_url or (
+            settings.oidc_issuer.rstrip("/") + "/protocol/openid-connect/certs"
+        )
+        _jwk_client = jwt.PyJWKClient(jwks_url)
+    return _jwk_client
+
+
+def authenticate_bearer(token: str) -> ApiKey:
+    """OIDC Access Token 검증 → ApiKey 형태로 매핑 (name=preferred_username, admin=롤 매핑)."""
+    import jwt  # noqa: PLC0415
+
+    settings = get_settings()
+    if not settings.oidc_issuer:
+        raise HTTPException(status_code=401, detail="OIDC not configured")
+    try:
+        signing_key = _get_jwk_client().get_signing_key_from_jwt(token)
+        options = {"verify_aud": bool(settings.oidc_audience)}
+        payload = jwt.decode(
+            token,
+            signing_key.key,
+            algorithms=["RS256"],
+            issuer=settings.oidc_issuer,
+            audience=settings.oidc_audience or None,
+            options=options,
+        )
+    except jwt.PyJWTError as e:
+        raise HTTPException(status_code=401, detail=f"invalid bearer token: {e}")
+
+    roles = set(payload.get("realm_access", {}).get("roles", []))
+    name = payload.get("preferred_username") or payload.get("sub", "oidc-user")
+    return ApiKey(name=name, key_hash="", is_admin=settings.oidc_admin_role in roles)
+
+
 def require_api_key(
     x_api_key: str = Header(default=""),
+    authorization: str = Header(default=""),
     db: Session = Depends(get_db),
 ) -> ApiKey:
     settings = get_settings()
+    if not x_api_key and authorization.lower().startswith("bearer "):
+        return authenticate_bearer(authorization[7:].strip())
     if not x_api_key:
         raise HTTPException(status_code=401, detail="x-api-key header required")
     if settings.admin_api_key and hmac.compare_digest(x_api_key, settings.admin_api_key):
