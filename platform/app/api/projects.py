@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -53,11 +53,18 @@ def create_project(
 async def deploy_project(
     project_id: int,
     body: DeployRequest,
+    response: Response,
     db: Session = Depends(get_db),
     key: ApiKey = Depends(require_api_key),
 ):
     project = _get_project(db, project_id)
     profile = body.profile or project.default_profile
+    if not body.wait:
+        record = deployer.deploy_queued(db, project, profile, body.git_sha)
+        response.status_code = 202
+        audit.record(db, key.name, "deploy.queued", project.name,
+                     {"profile": profile.value, "deployment_id": record.id})
+        return record
     try:
         record = await deployer.deploy(db, project, profile, body.git_sha)
     except DeployInProgress as e:

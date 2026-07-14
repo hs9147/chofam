@@ -53,8 +53,10 @@ def cancel(payment_key: str, reason: str) -> dict:
 
 
 def _post(url: str, headers: dict, payload: dict) -> tuple[int, dict]:
-    """실제 HTTP 경계 — 테스트에서 monkeypatch한다."""
-    res = httpx.post(url, headers=headers, json=payload, timeout=30)
+    """실제 HTTP 경계 — 테스트에서 monkeypatch한다. 네트워크 오류만 재시도(갭7)."""
+    from .httpx_retry import post_with_retry  # noqa: PLC0415
+
+    res = post_with_retry(url, headers=headers, json=payload, timeout=30)
     try:
         data = res.json()
     except ValueError:

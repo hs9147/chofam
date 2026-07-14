@@ -14,14 +14,35 @@ from .models import ApiKey
 _fernet: Fernet | None = None
 
 
+def _load_key_from_openbao() -> str:
+    """OpenBao KV v2에서 Fernet 키 로드 (갭5). 실패는 명확한 에러 — 임시 키 침묵 생성 금지."""
+    import httpx  # noqa: PLC0415
+
+    settings = get_settings()
+    url = f"{settings.openbao_url.rstrip('/')}/v1/{settings.openbao_key_path.strip('/')}"
+    try:
+        res = httpx.get(url, headers={"X-Vault-Token": settings.openbao_token}, timeout=10)
+    except Exception as e:
+        raise RuntimeError(f"OpenBao 연결 실패: {e}") from e
+    if res.status_code != 200:
+        raise RuntimeError(f"OpenBao 키 조회 실패 (HTTP {res.status_code}): {settings.openbao_key_path}")
+    key = res.json().get("data", {}).get("data", {}).get("key", "")
+    if not key:
+        raise RuntimeError(f"OpenBao 응답에 data.data.key 없음: {settings.openbao_key_path}")
+    return key
+
+
 def get_fernet() -> Fernet:
     global _fernet
     if _fernet is None:
         settings = get_settings()
-        key = settings.fernet_key
-        if not key:
-            # 운영에서는 반드시 PAAS_FERNET_KEY를 고정할 것 — 미설정 시 재기동마다 복호화 불가
-            key = Fernet.generate_key().decode()
+        if settings.openbao_url:
+            key = _load_key_from_openbao()
+        else:
+            key = settings.fernet_key
+            if not key:
+                # 운영에서는 PAAS_FERNET_KEY 고정 또는 OpenBao 사용 — 미설정 시 재기동마다 복호화 불가
+                key = Fernet.generate_key().decode()
         _fernet = Fernet(key.encode() if isinstance(key, str) else key)
     return _fernet
 
@@ -51,11 +72,58 @@ def verify_webhook_signature(secret: str, body: bytes, signature: str) -> bool:
     return hmac.compare_digest(expected, received)
 
 
+# --- OIDC (Keycloak 호환) — Bearer JWT 검증. API 키 체계와 병행 ---
+
+_jwk_client = None  # PyJWKClient — JWKS 캐시 내장
+
+
+def _get_jwk_client():
+    global _jwk_client
+    if _jwk_client is None:
+        import jwt  # noqa: PLC0415
+
+        settings = get_settings()
+        jwks_url = settings.oidc_jwks_url or (
+            settings.oidc_issuer.rstrip("/") + "/protocol/openid-connect/certs"
+        )
+        _jwk_client = jwt.PyJWKClient(jwks_url)
+    return _jwk_client
+
+
+def authenticate_bearer(token: str) -> ApiKey:
+    """OIDC Access Token 검증 → ApiKey 형태로 매핑 (name=preferred_username, admin=롤 매핑)."""
+    import jwt  # noqa: PLC0415
+
+    settings = get_settings()
+    if not settings.oidc_issuer:
+        raise HTTPException(status_code=401, detail="OIDC not configured")
+    try:
+        signing_key = _get_jwk_client().get_signing_key_from_jwt(token)
+        options = {"verify_aud": bool(settings.oidc_audience)}
+        payload = jwt.decode(
+            token,
+            signing_key.key,
+            algorithms=["RS256"],
+            issuer=settings.oidc_issuer,
+            audience=settings.oidc_audience or None,
+            options=options,
+        )
+    except jwt.PyJWTError as e:
+        raise HTTPException(status_code=401, detail=f"invalid bearer token: {e}")
+
+    roles = set(payload.get("realm_access", {}).get("roles", []))
+    name = payload.get("preferred_username") or payload.get("sub", "oidc-user")
+    return ApiKey(name=name, key_hash="", is_admin=settings.oidc_admin_role in roles)
+
+
 def require_api_key(
     x_api_key: str = Header(default=""),
+    authorization: str = Header(default=""),
     db: Session = Depends(get_db),
 ) -> ApiKey:
     settings = get_settings()
+    if not x_api_key and authorization.lower().startswith("bearer "):
+        return authenticate_bearer(authorization[7:].strip())
     if not x_api_key:
         raise HTTPException(status_code=401, detail="x-api-key header required")
     if settings.admin_api_key and hmac.compare_digest(x_api_key, settings.admin_api_key):

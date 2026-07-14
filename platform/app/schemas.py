@@ -35,6 +35,8 @@ class DeployRequest(BaseModel):
     # 빌드 옵션: development | release. 생략 시 프로젝트 기본값.
     profile: BuildProfile | None = None
     git_sha: str | None = None
+    # False면 202 + building 레코드 즉시 반환, 파이프라인은 작업 큐에서 실행 (폴링으로 확인)
+    wait: bool = True
 
 
 class DeploymentOut(BaseModel):

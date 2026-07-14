@@ -65,22 +65,34 @@ def make_spec(
 
 
 def deploy_sync(
-    db: Session, project: Project, profile: BuildProfile, git_sha: str | None = None
+    db: Session, project: Project, profile: BuildProfile, git_sha: str | None = None,
+    record: Deployment | None = None,
 ) -> Deployment:
-    """블로킹 배포 파이프라인. API에서는 스레드로 위임해 이벤트 루프를 막지 않는다."""
+    """블로킹 배포 파이프라인. API에서는 스레드로 위임해 이벤트 루프를 막지 않는다.
+
+    record가 주어지면(큐 경로에서 선생성) 새로 만들지 않고 그 레코드를 채운다.
+    """
     lock = _locks[project.id]
     if not lock.acquire(blocking=False):
+        if record is not None:
+            record.status = DeploymentStatus.failed
+            record.error = f"deployment already in progress for {project.name}"
+            record.finished_at = datetime.now(timezone.utc)
+            db.commit()
         raise DeployInProgress(project.name)
     try:
         workdir, sha = checkout(project, git_sha)
-        record = Deployment(
-            project_id=project.id,
-            git_sha=sha,
-            image_tag="",
-            profile=profile,
-            status=DeploymentStatus.building,
-        )
-        db.add(record)
+        if record is None:
+            record = Deployment(
+                project_id=project.id,
+                git_sha=sha,
+                image_tag="",
+                profile=profile,
+                status=DeploymentStatus.building,
+            )
+            db.add(record)
+        else:
+            record.git_sha = sha
         db.commit()
         try:
             result = build_image(project, workdir, sha, profile)
@@ -121,6 +133,43 @@ async def deploy(
     db: Session, project: Project, profile: BuildProfile, git_sha: str | None = None
 ) -> Deployment:
     return await asyncio.to_thread(deploy_sync, db, project, profile, git_sha)
+
+
+def deploy_queued(
+    db: Session, project: Project, profile: BuildProfile, git_sha: str | None = None
+) -> Deployment:
+    """비동기 배포(갭2): building 레코드를 즉시 만들고 파이프라인은 작업 큐에서 실행.
+
+    반환된 레코드 id로 GET /projects/{id}/deployments 폴링으로 진행을 확인한다.
+    """
+    from ..db import SessionLocal  # noqa: PLC0415
+    from . import jobs  # noqa: PLC0415
+
+    record = Deployment(
+        project_id=project.id,
+        git_sha=git_sha or "",
+        image_tag="",
+        profile=profile,
+        status=DeploymentStatus.building,
+    )
+    db.add(record)
+    db.commit()
+    record_id, project_id = record.id, project.id
+
+    def _task() -> None:
+        with SessionLocal() as session:
+            proj = session.get(Project, project_id)
+            rec = session.get(Deployment, record_id)
+            if proj is None or rec is None:
+                return
+            try:
+                deploy_sync(session, proj, profile, git_sha, record=rec)
+            except Exception:
+                # 실패 상태·에러는 deploy_sync가 레코드에 기록함
+                pass
+
+    jobs.submit(_task)
+    return record
 
 
 def rollback(db: Session, project: Project, profile: BuildProfile) -> Deployment:

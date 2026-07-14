@@ -36,6 +36,20 @@ class Settings(BaseSettings):
     toss_secret_key: str = ""
     toss_api_base: str = "https://api.tosspayments.com"
 
+    # --- OIDC/RBAC (Keycloak 호환, 선택 — API 키 체계와 병행) ---
+    oidc_issuer: str = ""  # 예: https://sso.example.com/realms/company
+    oidc_audience: str = ""  # 비우면 audience 검증 생략
+    oidc_jwks_url: str = ""  # 비우면 {issuer}/protocol/openid-connect/certs (Keycloak 규약)
+    oidc_admin_role: str = "paas-admin"  # realm_access.roles에 이 롤이 있으면 admin
+
+    # --- 배포 작업 큐 ---
+    deploy_workers: int = 2
+
+    # --- OpenBao 시크릿 (선택 — 설정 시 Fernet 키를 KV v2에서 로드) ---
+    openbao_url: str = ""  # 예: https://bao.example.com
+    openbao_token: str = ""
+    openbao_key_path: str = "secret/data/paas/fernet"  # data.data.key 에 Fernet 키 저장
+
     database_url: str = "sqlite:///./paas.db"
     base_domain: str = "deploy.localhost"
 
@@ -59,6 +73,9 @@ class Settings(BaseSettings):
     k8s_registry: str = ""  # 예: harbor.example.com/paas — 빈 값이면 로컬 이미지명 사용
     k8s_ingress_class: str = "traefik"
     k8s_cluster_issuer: str = "letsencrypt"  # cert-manager ClusterIssuer
+    # 멀티테넌시 격리(갭6): 유닛별 NetworkPolicy 생성 — ingress 컨트롤러·동일 네임스페이스만 허용
+    k8s_isolation: bool = False
+    k8s_ingress_namespace: str = "traefik"  # ingress 컨트롤러가 사는 네임스페이스
     # kubernetes 패키지가 없거나 apply 권한이 없을 때 매니페스트를 내려쓸 위치
     k8s_manifest_dir: Path = Path("./data/k8s-manifests")
 
