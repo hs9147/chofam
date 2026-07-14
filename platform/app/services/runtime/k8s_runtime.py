@@ -179,6 +179,48 @@ def build_manifests(spec: RuntimeSpec) -> list[dict]:
     return manifests
 
 
+def namespace_manifests() -> list[dict]:
+    """네임스페이스 부트스트랩(후속3) — Namespace + (설정 시) ResourceQuota·LimitRange.
+
+    앱 유닛 매니페스트와 달리 네임스페이스당 1회만 필요한 리소스.
+    GitOps 모드에서는 _namespace.yaml로 함께 커밋되고, 직접 apply 모드에서는
+    첫 배포 시 함께 적용된다.
+    """
+    settings = get_settings()
+    ns = settings.k8s_namespace
+    manifests: list[dict] = [{
+        "apiVersion": "v1",
+        "kind": "Namespace",
+        "metadata": {"name": ns, "labels": {"app.kubernetes.io/managed-by": "paas"}},
+    }]
+    if settings.k8s_quota_cpu or settings.k8s_quota_memory:
+        hard: dict[str, str] = {}
+        if settings.k8s_quota_cpu:
+            hard["requests.cpu"] = settings.k8s_quota_cpu
+            hard["limits.cpu"] = settings.k8s_quota_cpu
+        if settings.k8s_quota_memory:
+            hard["requests.memory"] = settings.k8s_quota_memory
+            hard["limits.memory"] = settings.k8s_quota_memory
+        manifests.append({
+            "apiVersion": "v1",
+            "kind": "ResourceQuota",
+            "metadata": {"name": "paas-quota", "namespace": ns},
+            "spec": {"hard": hard},
+        })
+        # Quota가 걸린 네임스페이스는 limits 미지정 파드가 거부되므로 기본값을 깔아준다
+        manifests.append({
+            "apiVersion": "v1",
+            "kind": "LimitRange",
+            "metadata": {"name": "paas-defaults", "namespace": ns},
+            "spec": {"limits": [{
+                "type": "Container",
+                "default": {"cpu": "500m", "memory": "512Mi"},
+                "defaultRequest": {"cpu": "100m", "memory": "128Mi"},
+            }]},
+        })
+    return manifests
+
+
 def _gitops_git(cwd: Path | None, *args: str) -> None:
     proc = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True)
     if proc.returncode != 0:
@@ -206,6 +248,10 @@ class K8sRuntime(Runtime):
         repo_dir = self._sync_gitops_repo()
         target_dir = repo_dir / settings.k8s_gitops_path
         target_dir.mkdir(parents=True, exist_ok=True)
+        (target_dir / "_namespace.yaml").write_text(
+            yaml.safe_dump_all(namespace_manifests(), sort_keys=False, allow_unicode=True),
+            encoding="utf-8",
+        )
         (target_dir / f"{spec.unit_name}.yaml").write_text(
             yaml.safe_dump_all(manifests, sort_keys=False, allow_unicode=True),
             encoding="utf-8",
