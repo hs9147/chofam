@@ -187,8 +187,15 @@ npm run build        # tsc 타입체크 + vite build → dist/
 - **OpenBao 시크릿**: `PAAS_OPENBAO_URL/TOKEN/KEY_PATH` 설정 시 Fernet 키를 KV v2에서 로드.
 - **멀티테넌시 격리**: `PAAS_K8S_ISOLATION=true` → 유닛별 NetworkPolicy
   (ingress 컨트롤러 네임스페이스는 `PAAS_K8S_INGRESS_NAMESPACE`).
-- **외부 호출 재시도**: 토스·메일 호출은 네트워크 오류에 한해 3회 백오프 재시도
-  (HTTP 오류 응답은 재시도하지 않음 — 결제 중복 방지).
+- **외부 호출 재시도 + 서킷브레이커**: 토스·메일 호출은 네트워크 오류에 한해 3회 백오프
+  재시도(HTTP 오류 응답은 재시도하지 않음 — 결제 중복 방지). 호스트별 연속 5회 실패 시
+  60초 차단 후 half-open 복구.
+- **GitOps(ArgoCD)**: `PAAS_K8S_GITOPS_REPO` 설정 시 직접 apply 대신 매니페스트를
+  해당 리포에 커밋·푸시 (`PAAS_K8S_GITOPS_BRANCH`/`_PATH`). ArgoCD가 sync 담당.
+- **키 회전**: 새 키를 `PAAS_FERNET_KEY`로, 기존 키를 `PAAS_FERNET_KEYS_OLD`로 옮겨
+  재기동 → `POST /admin/rotate-secrets`(admin) → 완료 후 구 키 제거.
+- **네임스페이스 Quota**: `PAAS_K8S_QUOTA_CPU`/`_MEMORY` 설정 시 ResourceQuota +
+  기본 LimitRange 매니페스트 생성.
 
 ## DB 마이그레이션 (PostgreSQL 운영)
 
