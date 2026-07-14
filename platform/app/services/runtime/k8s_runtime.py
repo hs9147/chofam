@@ -12,11 +12,16 @@ kubernetes 패키지 + 클러스터 접근이 가능하면 직접 apply하고,
   development → replicas 1, 리소스 절반, Recreate 전략, {name}-dev 도메인
   release     → replicas 2(기본), 리소스 전량, RollingUpdate(maxUnavailable 0)
 """
+import subprocess
 import time
 from pathlib import Path
 
 
 class K8sApplyError(RuntimeError):
+    pass
+
+
+class GitOpsError(RuntimeError):
     pass
 
 import yaml
@@ -174,13 +179,115 @@ def build_manifests(spec: RuntimeSpec) -> list[dict]:
     return manifests
 
 
+def namespace_manifests() -> list[dict]:
+    """네임스페이스 부트스트랩(후속3) — Namespace + (설정 시) ResourceQuota·LimitRange.
+
+    앱 유닛 매니페스트와 달리 네임스페이스당 1회만 필요한 리소스.
+    GitOps 모드에서는 _namespace.yaml로 함께 커밋되고, 직접 apply 모드에서는
+    첫 배포 시 함께 적용된다.
+    """
+    settings = get_settings()
+    ns = settings.k8s_namespace
+    manifests: list[dict] = [{
+        "apiVersion": "v1",
+        "kind": "Namespace",
+        "metadata": {"name": ns, "labels": {"app.kubernetes.io/managed-by": "paas"}},
+    }]
+    if settings.k8s_quota_cpu or settings.k8s_quota_memory:
+        hard: dict[str, str] = {}
+        if settings.k8s_quota_cpu:
+            hard["requests.cpu"] = settings.k8s_quota_cpu
+            hard["limits.cpu"] = settings.k8s_quota_cpu
+        if settings.k8s_quota_memory:
+            hard["requests.memory"] = settings.k8s_quota_memory
+            hard["limits.memory"] = settings.k8s_quota_memory
+        manifests.append({
+            "apiVersion": "v1",
+            "kind": "ResourceQuota",
+            "metadata": {"name": "paas-quota", "namespace": ns},
+            "spec": {"hard": hard},
+        })
+        # Quota가 걸린 네임스페이스는 limits 미지정 파드가 거부되므로 기본값을 깔아준다
+        manifests.append({
+            "apiVersion": "v1",
+            "kind": "LimitRange",
+            "metadata": {"name": "paas-defaults", "namespace": ns},
+            "spec": {"limits": [{
+                "type": "Container",
+                "default": {"cpu": "500m", "memory": "512Mi"},
+                "defaultRequest": {"cpu": "100m", "memory": "128Mi"},
+            }]},
+        })
+    return manifests
+
+
+def _gitops_git(cwd: Path | None, *args: str) -> None:
+    proc = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True)
+    if proc.returncode != 0:
+        raise GitOpsError(
+            f"gitops git {args[0]} 실패: {(proc.stderr or proc.stdout).strip()[:500]}"
+        )
+
+
 class K8sRuntime(Runtime):
     def start(self, spec: RuntimeSpec) -> Endpoint:
+        settings = get_settings()
         manifests = build_manifests(spec)
-        if not self._apply(manifests):
+        if settings.k8s_gitops_repo:
+            # GitOps(ArgoCD) 모드: 직접 apply 대신 매니페스트를 리포에 커밋·푸시
+            self._gitops_push(spec, manifests)
+        elif not self._apply(manifests):
             self._write_manifests(spec, manifests)
         # 트래픽은 Ingress가 받으므로 프록시 전환 불필요. Service 주소를 참고용으로 반환.
         return Endpoint(host=f"{spec.unit_name}.{get_settings().k8s_namespace}.svc", port=80)
+
+    # --- GitOps(ArgoCD) 연계 ---
+
+    def _gitops_push(self, spec: RuntimeSpec, manifests: list[dict]) -> None:
+        settings = get_settings()
+        repo_dir = self._sync_gitops_repo()
+        target_dir = repo_dir / settings.k8s_gitops_path
+        target_dir.mkdir(parents=True, exist_ok=True)
+        (target_dir / "_namespace.yaml").write_text(
+            yaml.safe_dump_all(namespace_manifests(), sort_keys=False, allow_unicode=True),
+            encoding="utf-8",
+        )
+        (target_dir / f"{spec.unit_name}.yaml").write_text(
+            yaml.safe_dump_all(manifests, sort_keys=False, allow_unicode=True),
+            encoding="utf-8",
+        )
+        _gitops_git(repo_dir, "add", "-A")
+        status = subprocess.run(
+            ["git", "status", "--porcelain"], cwd=repo_dir, capture_output=True, text=True
+        )
+        if not status.stdout.strip():
+            return  # 동일 매니페스트 재배포 — 커밋할 변경 없음
+        _gitops_git(
+            repo_dir,
+            "-c", "user.name=paas-bot", "-c", "user.email=paas-bot@localhost",
+            "commit", "-m", f"paas: deploy {spec.unit_name} ({spec.image_tag})",
+        )
+        _gitops_git(repo_dir, "push", "-u", "origin", settings.k8s_gitops_branch)
+
+    def _sync_gitops_repo(self) -> Path:
+        settings = get_settings()
+        repo_dir = settings.work_dir / "_gitops"
+        if not (repo_dir / ".git").exists():
+            import shutil  # noqa: PLC0415
+
+            shutil.rmtree(repo_dir, ignore_errors=True)
+            _gitops_git(None, "clone", settings.k8s_gitops_repo, str(repo_dir))
+        _gitops_git(repo_dir, "fetch", "origin")
+        remote = subprocess.run(
+            ["git", "ls-remote", "--heads", "origin", settings.k8s_gitops_branch],
+            cwd=repo_dir, capture_output=True, text=True,
+        )
+        if remote.stdout.strip():
+            _gitops_git(repo_dir, "checkout", "-B", settings.k8s_gitops_branch,
+                        f"origin/{settings.k8s_gitops_branch}")
+        else:
+            _gitops_git(repo_dir, "checkout", "-B", settings.k8s_gitops_branch)
+        return repo_dir
 
     def stop(self, project_name: str, profile: BuildProfile) -> None:
         spec = RuntimeSpec(project_name, "", 0, profile, "")

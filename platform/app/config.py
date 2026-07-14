@@ -57,6 +57,10 @@ class Settings(BaseSettings):
     admin_api_key: str = ""
     # EnvVar 암호화용 Fernet 키(urlsafe base64 32byte). 미설정 시 개발용 키를 생성한다.
     fernet_key: str = ""
+    # 키 회전용 구(舊) 키 목록(콤마 구분) — 복호화에만 사용, 암호화는 fernet_key로.
+    # 회전 절차: 새 키 발급 → fernet_key 교체 + 기존 키를 여기로 이동 →
+    # POST /admin/rotate-secrets 로 전체 재암호화 → 구 키 제거.
+    fernet_keys_old: str = ""
 
     # Git 작업 디렉토리 / 빌드 로그 저장소
     work_dir: Path = Path("./data/workspaces")
@@ -76,6 +80,13 @@ class Settings(BaseSettings):
     # 멀티테넌시 격리(갭6): 유닛별 NetworkPolicy 생성 — ingress 컨트롤러·동일 네임스페이스만 허용
     k8s_isolation: bool = False
     k8s_ingress_namespace: str = "traefik"  # ingress 컨트롤러가 사는 네임스페이스
+    # GitOps(ArgoCD) 연계: 설정 시 직접 apply 대신 매니페스트를 이 리포에 커밋·푸시
+    k8s_gitops_repo: str = ""  # 예: git@git.example.com:org/paas-apps.git
+    k8s_gitops_branch: str = "main"
+    k8s_gitops_path: str = "apps"  # 리포 내 매니페스트 디렉토리
+    # 네임스페이스 ResourceQuota (빈 값이면 미생성)
+    k8s_quota_cpu: str = ""  # 예: "20"
+    k8s_quota_memory: str = ""  # 예: "64Gi"
     # kubernetes 패키지가 없거나 apply 권한이 없을 때 매니페스트를 내려쓸 위치
     k8s_manifest_dir: Path = Path("./data/k8s-manifests")
 

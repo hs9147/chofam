@@ -470,10 +470,10 @@ POST /projects/{id}/preview        DELETE /previews/{id}
 | 1 | 인증이 API 키 단일 체계 | Keycloak OIDC/RBAC — Bearer JWT·JWKS·롤 매핑, API 키 병행 | ✅ 구현됨 |
 | 2 | 배포가 동기 실행 | 작업 큐 — `wait=false` 202 + 백그라운드 실행 (arq 교체 가능한 submit 경계) | ✅ 구현됨 |
 | 3 | DB 기본 SQLite | Alembic 마이그레이션 체계 (PostgreSQL 전환 절차 README) | ✅ 구현됨 |
-| 4 | K8s apply 실패 시 조용한 파일 폴백 | 접근 불가만 폴백, apply 실패는 3회 재시도 후 에러 표면화 | ✅ 구현됨 (ArgoCD 연계는 추후) |
-| 5 | 시크릿 Fernet 단일 키 | OpenBao KV v2에서 키 로드 (`PAAS_OPENBAO_*`) | ✅ 구현됨 (키 회전 절차는 추후) |
-| 6 | 멀티테넌시 격리 없음 | 유닛별 NetworkPolicy (`PAAS_K8S_ISOLATION`) | ✅ 구현됨 (Quota는 추후) |
-| 7 | 외부 호출(토스·메일) 재시도 없음 | 네트워크 오류 한정 백오프 재시도 (비멱등 중복 방지) | ✅ 구현됨 (서킷브레이커는 추후) |
+| 4 | K8s apply 실패 시 조용한 파일 폴백 | 접근 불가만 폴백, apply 실패는 3회 재시도 후 에러 표면화 + **GitOps(ArgoCD) 모드**(`PAAS_K8S_GITOPS_REPO` — 매니페스트 커밋·푸시) | ✅ 구현됨 |
+| 5 | 시크릿 Fernet 단일 키 | OpenBao KV v2 키 로드 + **키 회전**(`PAAS_FERNET_KEYS_OLD` 병행 복호화, `POST /admin/rotate-secrets` 재암호화) | ✅ 구현됨 |
+| 6 | 멀티테넌시 격리 없음 | 유닛별 NetworkPolicy + **네임스페이스 ResourceQuota·LimitRange**(`PAAS_K8S_QUOTA_*`) | ✅ 구현됨 |
+| 7 | 외부 호출(토스·메일) 재시도 없음 | 네트워크 오류 한정 백오프 재시도 + **호스트별 서킷브레이커**(연속 5회 실패 → 60초 차단, half-open 복구) | ✅ 구현됨 |
 
 **추가 아이디어**
 
