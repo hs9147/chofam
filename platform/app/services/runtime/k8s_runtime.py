@@ -4,11 +4,20 @@
 kubernetes 패키지 + 클러스터 접근이 가능하면 직접 apply하고,
 아니면 매니페스트 YAML을 k8s_manifest_dir에 기록한다 (kubectl apply -f 또는 GitOps 연계).
 
+에러 정책(갭4): "클러스터 접근 불가"(패키지 없음/설정 없음)만 파일 폴백이고,
+클러스터에 연결된 상태의 apply 실패는 3회 재시도 후 K8sApplyError로 표면화한다 —
+조용한 폴백은 배포 성공으로 오인되므로 금지.
+
 프로필 반영:
   development → replicas 1, 리소스 절반, Recreate 전략, {name}-dev 도메인
   release     → replicas 2(기본), 리소스 전량, RollingUpdate(maxUnavailable 0)
 """
+import time
 from pathlib import Path
+
+
+class K8sApplyError(RuntimeError):
+    pass
 
 import yaml
 
@@ -195,18 +204,29 @@ class K8sRuntime(Runtime):
         try:
             from kubernetes import client, config, utils  # noqa: PLC0415
         except ImportError:
-            return False
+            return False  # 패키지 없음 → 파일 폴백 (GitOps 경로)
         try:
             try:
                 config.load_incluster_config()
             except Exception:
                 config.load_kube_config()
-            k8s = client.ApiClient()
-            for m in manifests:
-                utils.create_from_dict(k8s, m, apply=True)
-            return True
         except Exception:
-            return False
+            return False  # 클러스터 설정 없음 → 파일 폴백
+
+        # 여기부터는 클러스터에 연결된 상태 — 실패를 삼키지 않는다
+        k8s = client.ApiClient()
+        last_error: Exception | None = None
+        for attempt in range(3):
+            try:
+                for m in manifests:
+                    utils.create_from_dict(k8s, m, apply=True)
+                return True
+            except Exception as e:  # noqa: BLE001 — 재시도 후 표면화
+                last_error = e
+                time.sleep(0.5 * (attempt + 1))
+        raise K8sApplyError(
+            f"K8s apply 실패 (3회 재시도 후): {str(last_error)[:500]}"
+        )
 
     def _write_manifests(self, spec: RuntimeSpec, manifests: list[dict]) -> Path:
         out = get_settings().k8s_manifest_dir / f"{spec.unit_name}.yaml"
