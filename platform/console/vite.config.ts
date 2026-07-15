@@ -1,6 +1,5 @@
-/// <reference types="vitest" />
 import react from '@vitejs/plugin-react';
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vitest/config';
 
 // 백엔드에 공통 /api prefix가 없으므로 라우터 prefix를 열거해 프록시한다
 const API_PREFIXES = [
