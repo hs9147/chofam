@@ -19,6 +19,7 @@ import type {
   ProjectFilesOut,
   ProjectOut,
   ProjectType,
+  ResourceItem,
   ReviewResult,
   StatusSnapshot,
 } from './types';
@@ -177,9 +178,20 @@ export const api = {
 
   // 모듈
   listModules: () => request<ModuleOut[]>('GET', '/modules'),
-  createModule: (name: string, type: string, config: Record<string, unknown>) =>
-    request<ModuleOut>('POST', '/modules', { name, type, config }),
+  createModule: (
+    name: string,
+    type: string,
+    config: Record<string, unknown>,
+    category?: string,
+    organization_id?: number,
+  ) =>
+    request<ModuleOut>('POST', '/modules', {
+      name, type, config,
+      category: category || null,
+      organization_id: organization_id ?? null,
+    }),
   projectModules: (id: number) => request<ModuleSummary[]>('GET', `/projects/${id}/modules`),
+  projectResources: (id: number) => request<ResourceItem[]>('GET', `/projects/${id}/resources`),
   bindModule: (projectId: number, moduleId: number, env_prefix: string) =>
     request<{ injected_env: string[] }>(
       'POST', `/projects/${projectId}/modules/${moduleId}/bind`, { env_prefix },

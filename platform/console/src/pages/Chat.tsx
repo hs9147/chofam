@@ -1,10 +1,11 @@
 import { useState } from 'react';
+import Async from '../components/Async';
 import DiffView from '../components/DiffView';
 import StatusPill from '../components/StatusPill';
 import { api } from '../lib/api';
 import { extractDiffFromReply } from '../lib/diff';
 import { useApi } from '../lib/hooks';
-import type { ChatSessionOut, ReviewResult } from '../lib/types';
+import type { ChatSessionOut, ResourceItem, ReviewResult } from '../lib/types';
 
 interface Msg {
   role: 'user' | 'assistant';
@@ -14,11 +15,32 @@ interface Msg {
   appliedSha?: string;
 }
 
+function groupResources(items: ResourceItem[]) {
+  const apiByCategory: Record<string, ResourceItem[]> = {};
+  const files: ResourceItem[] = [];
+  const databases: ResourceItem[] = [];
+  for (const r of items) {
+    if (r.type === 'external_api' || r.type === 'internal_api') {
+      const key = r.category || '기타';
+      (apiByCategory[key] ??= []).push(r);
+    } else if (r.type === 'file_storage') {
+      files.push(r);
+    } else if (r.type === 'database') {
+      databases.push(r);
+    }
+  }
+  return { apiByCategory, files, databases };
+}
+
 export default function Chat() {
   const projects = useApi(() => api.listProjects());
   const providers = useApi(() => api.listProviders());
 
   const [projectId, setProjectId] = useState('');
+  const resourcesState = useApi(
+    () => (projectId ? api.projectResources(Number(projectId)) : Promise.resolve([])),
+    [projectId],
+  );
   const [providerId, setProviderId] = useState('');
   const [branch, setBranch] = useState('');
   const [session, setSession] = useState<ChatSessionOut | null>(null);
@@ -150,6 +172,68 @@ export default function Chat() {
           )}
         </form>
       </div>
+
+      {projectId && (
+        <div className="panel">
+          <h2 style={{ margin: '0 0 10px' }}>사용 가능한 자원</h2>
+          <Async state={resourcesState} empty="등록된 자원이 없습니다.">
+            {(items) => {
+              const { apiByCategory, files, databases } = groupResources(items);
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {Object.keys(apiByCategory).length > 0 && (
+                    <div>
+                      <div className="mutedtext" style={{ fontSize: 11, marginBottom: 6 }}>
+                        API (카테고리별)
+                      </div>
+                      {Object.entries(apiByCategory).map(([cat, list]) => (
+                        <div key={cat} className="row" style={{ marginBottom: 4, flexWrap: 'wrap' }}>
+                          <span className="mutedtext mono" style={{ fontSize: 11, minWidth: 70 }}>
+                            {cat}
+                          </span>
+                          {list.map((r) => (
+                            <span key={r.id} className="status info" title={r.type}>
+                              {r.name}
+                              {r.scope === 'org' && ' (조직)'}
+                            </span>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {files.length > 0 && (
+                    <div>
+                      <div className="mutedtext" style={{ fontSize: 11, marginBottom: 6 }}>
+                        서버내 공유 파일
+                      </div>
+                      <div className="row" style={{ flexWrap: 'wrap' }}>
+                        {files.map((r) => (
+                          <span key={r.id} className="status dim">{r.name}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {databases.length > 0 && (
+                    <div>
+                      <div className="mutedtext" style={{ fontSize: 11, marginBottom: 6 }}>
+                        DB (조직별)
+                      </div>
+                      <div className="row" style={{ flexWrap: 'wrap' }}>
+                        {databases.map((r) => (
+                          <span key={r.id} className="status warn">
+                            {r.name}
+                            {r.scope === 'org' && ' (조직)'}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            }}
+          </Async>
+        </div>
+      )}
 
       {session && (
         <div className="panel">

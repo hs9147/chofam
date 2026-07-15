@@ -194,6 +194,14 @@ class Module(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(64), unique=True)
     type: Mapped[ModuleType] = mapped_column(Enum(ModuleType))
+    # 자유 텍스트 분류(예: "news", "llm", "payment") — 대화식 편집 화면의 자원
+    # 리스팅에서 API를 카테고리별로 묶어 보여주는 용도. 미지정이면 "기타"로 묶인다.
+    category: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # 미지정(NULL) = 전역(모든 프로젝트에 노출), 지정 시 해당 조직 소속 프로젝트에만 노출
+    # ("조직별 db" 등 조직 전용 자원).
+    organization_id: Mapped[int | None] = mapped_column(
+        ForeignKey("organizations.id"), nullable=True
+    )
     # 민감 필드(api_key, dsn, password, secret)는 저장 시 Fernet 암호화됨
     config: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

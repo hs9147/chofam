@@ -12,8 +12,8 @@ export default function Layout() {
   const has = (f: string) => features.includes(f);
 
   return (
-    <>
-      <header className="topbar">
+    <div className="app-shell">
+      <aside className="sidebar">
         <h1>PaaS 콘솔</h1>
         <nav>
           {admin && <NavLink to="/">대시보드</NavLink>}
@@ -26,27 +26,29 @@ export default function Layout() {
           {has('payment') && admin && <NavLink to="/payments">결제</NavLink>}
           {admin && <NavLink to="/audit">감사 로그</NavLink>}
         </nav>
-        {health.data && (
-          <span className="status dim" title={`tier=${health.data.tier}`}>
-            {health.data.host_os}
+        <div className="sidebar-footer">
+          {health.data && (
+            <span className="status dim" title={`tier=${health.data.tier}`}>
+              {health.data.host_os}
+            </span>
+          )}
+          <span className="mutedtext" style={{ fontSize: 12 }}>
+            {admin ? 'admin' : 'member'}
           </span>
-        )}
-        <span className="mutedtext" style={{ fontSize: 12 }}>
-          {admin ? 'admin' : 'member'}
-        </span>
-        <button
-          className="secondary small"
-          onClick={() => {
-            logout();
-            navigate('/login');
-          }}
-        >
-          로그아웃
-        </button>
-      </header>
+          <button
+            className="secondary small"
+            onClick={() => {
+              logout();
+              navigate('/login');
+            }}
+          >
+            로그아웃
+          </button>
+        </div>
+      </aside>
       <main>
         <Outlet />
       </main>
-    </>
+    </div>
   );
 }

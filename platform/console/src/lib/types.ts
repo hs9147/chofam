@@ -59,6 +59,8 @@ export interface ModuleOut {
   id: number;
   name: string;
   type: string;
+  category: string | null;
+  organization_id: number | null;
   config: Record<string, unknown>;
 }
 
@@ -66,6 +68,15 @@ export interface ModuleSummary {
   name: string;
   type: string;
   env: string[];
+}
+
+// 대화식 편집 화면 자원 리스팅 — 바인딩 여부와 무관하게 사용 가능한 모듈을 아이템화
+export interface ResourceItem {
+  id: number;
+  name: string;
+  type: string;
+  category: string | null;
+  scope: 'global' | 'org';
 }
 
 export interface LlmProviderOut {

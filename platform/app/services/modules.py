@@ -85,6 +85,28 @@ def env_for_project(db: Session, project: Project) -> dict[str, str]:
     return env
 
 
+def available_resources(db: Session, project: Project) -> list[dict]:
+    """대화식 편집 화면의 자원 리스팅용 — 이 프로젝트에서 사용 가능한 모든 모듈을
+    카테고리별로 아이템화한다(바인딩 여부와 무관, 비밀값 제외).
+
+    organization_id가 없는 모듈은 전역(모든 프로젝트에 노출), 있는 모듈은 같은
+    조직 소속 프로젝트에만 노출된다("조직별 db" 등 조직 전용 자원).
+    """
+    rows = db.execute(select(Module).order_by(Module.type, Module.category, Module.name)).scalars()
+    result = []
+    for m in rows:
+        if m.organization_id is not None and m.organization_id != project.organization_id:
+            continue
+        result.append({
+            "id": m.id,
+            "name": m.name,
+            "type": m.type.value,
+            "category": m.category,
+            "scope": "org" if m.organization_id is not None else "global",
+        })
+    return result
+
+
 def context_for_llm(db: Session, project: Project) -> list[dict]:
     """채팅 컨텍스트용 — LLM이 규약에 맞는 연동 코드를 생성하도록 모듈 목록을 요약(비밀값 제외)."""
     rows = db.execute(

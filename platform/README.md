@@ -151,9 +151,13 @@ POST /changes/{id}/reject
 POST /projects/{id}/review              # {provider_id, diff? , base_ref?} → 심각도 분류 findings
 
 POST /modules                           # external_api | internal_api | database | file_storage
+                                        #   + category?(예: news, llm — API 카테고리별 그룹핑)
+                                        #   + organization_id?(지정 시 해당 조직 프로젝트에만 노출)
                                         # config의 api_key/dsn/secret 등은 Fernet 암호화 저장
 POST /projects/{id}/modules/{mid}/bind  # {env_prefix: "PAY"} → 배포 시 PAY_URL 등 자동 주입
-GET  /projects/{id}/modules             # LLM 컨텍스트용 요약 (비밀값 제외)
+GET  /projects/{id}/modules             # LLM 컨텍스트용 요약 (비밀값 제외, 바인딩된 모듈만)
+GET  /projects/{id}/resources           # 대화식 편집 화면 자원 리스팅 — 바인딩 여부와 무관하게
+                                        #   이 프로젝트에서 쓸 수 있는 모든 모듈을 카테고리별로 아이템화
 
 POST /projects/{id}/preview             # {branch?, ttl_minutes=60} → {name}-pv{n}.{base_domain}
 GET  /projects/{id}/previews            # 조회 시 만료 프리뷰 자동 회수
@@ -179,11 +183,14 @@ npm run build        # tsc 타입체크 + vite build → dist/
 
 - 접속: `http://<서버>:7000/console/` → API 키로 로그인
   (admin 키: 대시보드·감사 로그·키 발급·프로바이더 등록 포함, 일반 키: 프로젝트 운영 화면)
+- 레이아웃: 메뉴는 왼쪽 고정 사이드바(`components/Layout.tsx`)에 배치되고, OS 태그·계정
+  구분·로그아웃은 사이드바 하단에 있다
 - 화면: 시스템 대시보드(CPU/메모리/디스크/GPU 게이지, 키 발급), 프로젝트(생성 시 git_url 직접
   입력/조직 소속 자동 생성/zip·폴더 업로드 3가지 방식 선택, dev/release 배포·롤백·중지·배포
   이력·로그 3초 폴링·환경변수·모듈 바인딩·프리뷰), 코드 확인(읽기 전용 파일 트리·내용 뷰어 —
-  수정은 채팅 탭에서 diff로만), 모듈 레지스트리, LLM 프로바이더,
-  대화식 코드 편집(diff 뷰 + 승인/거절 + 브랜치 리뷰), 감사 로그
+  수정은 채팅 탭에서 diff로만), 모듈 레지스트리(카테고리·조직 범위 표시), LLM 프로바이더,
+  대화식 코드 편집(diff 뷰 + 승인/거절 + 브랜치 리뷰 + 프로젝트 선택 시 카테고리별 사용 가능
+  자원 패널: API 카테고리·서버내 공유 파일·조직별 DB 아이템 리스팅), 감사 로그
 - 인증은 `x-api-key`를 sessionStorage에 보관(기존 admin/mail 관례). 로그인 검증은 admin 전용
   `GET /status` 응답 코드(200 admin / 403 일반 / 401 무효)를 프로브로 재사용
 - 의존성: react·react-dom·react-router-dom (전부 MIT). 라우팅은 해시 기반이라 새로고침·딥링크에

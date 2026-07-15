@@ -156,6 +156,10 @@ class ReviewRequest(BaseModel):
 class ModuleCreate(BaseModel):
     name: str = Field(pattern=r"^[a-z0-9][a-z0-9-]{1,40}$")
     type: str = Field(pattern=r"^(external_api|internal_api|database|file_storage)$")
+    # 카테고리별 API 리스팅용(예: "news", "llm") — 대화식 편집 화면의 자원 목록에서 그룹핑
+    category: str | None = None
+    # 지정 시 해당 조직 소속 프로젝트에만 노출("조직별 db" 등). 미지정=전역
+    organization_id: int | None = None
     config: dict = {}
 
 
