@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from .. import audit
 from ..db import get_db
 from ..features import require_feature
+from ..git_policy import enforce_internal_git_url
 from ..models import ApiKey, BuildProfile, Deployment, EnvVar, Project
 from ..schemas import (
     DeploymentOut,
@@ -41,6 +42,7 @@ def create_project(
     exists = db.execute(select(Project).where(Project.name == body.name)).scalar_one_or_none()
     if exists:
         raise HTTPException(status_code=409, detail="project name already exists")
+    enforce_internal_git_url(body.git_url)
     project = Project(**body.model_dump())
     db.add(project)
     db.commit()

@@ -96,6 +96,10 @@ class Settings(BaseSettings):
     # 사내 Git 서버(Gitea 등) 기본 URL — 콘솔에 "Git" 메뉴를 노출하는 용도로만 쓰인다
     # (배포 동작에는 영향 없음, git_url은 프로젝트별로 여전히 개별 지정). infra/gitea/ 참고.
     gitea_url: str = ""
+    # 기업용 거버넌스: true면 프로젝트 등록 시 git_url 호스트가 gitea_url과 일치해야
+    # 한다(github.com 등 외부 호스트 등록을 422로 거부). "소스가 사외로 나가지 않는다"는
+    # 보장을 internal LLM 강제(schemas.py)와 동일한 원칙으로 git 저장소에도 적용한다.
+    git_internal_only: bool = False
 
     # release 빌드 기본 리소스 (development는 build.py의 프로필 정의가 절반 수준으로 축소)
     default_memory_limit: str = "1g"

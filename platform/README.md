@@ -184,6 +184,9 @@ npm run build        # tsc 타입체크 + vite build → dist/
   Docker Compose(1차)/K8s manifests(2차) + 웹훅·Keycloak SSO 연동은
   [`infra/gitea/README.md`](infra/gitea/README.md) 참고. `PAAS_GITEA_URL`을 설정하면
   콘솔 상단 메뉴에 **Git** 탭이 나타나 등록된 프로젝트별 리포 바로가기를 보여준다.
+- **코드 내부 관리 강제**: `PAAS_GIT_INTERNAL_ONLY=true` + `PAAS_GITEA_URL` 설정 시
+  프로젝트 등록 단계에서 `git_url` 호스트가 사내 Gitea와 다르면 422로 거부(github.com 등
+  외부 호스트 등록 원천 차단). internal LLM 프로바이더 강제(12절)와 동일한 원칙.
 - **OIDC/RBAC (Keycloak 호환)**: `PAAS_OIDC_ISSUER` 설정 시 `Authorization: Bearer <JWT>`
   인증 병행. `realm_access.roles`에 `PAAS_OIDC_ADMIN_ROLE`(기본 paas-admin)이 있으면 admin.
 - **비동기 배포**: `POST /projects/{id}/deploy`에 `"wait": false` → 202 즉시 반환,

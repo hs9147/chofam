@@ -280,8 +280,15 @@ Gitea 선택 시: 배포 서버의 GitHub Webhook 처리(3.6절)는 Gitea 웹훅
 (HMAC 서명 헤더만 `X-Gitea-Signature`) 코드 수정이 최소화됩니다.
 
 **구현 완료** — `platform/infra/gitea/`에 1차(Docker Compose)·2차(K8s manifests) 배포 산출물과
-웹훅·Keycloak SSO 연동 절차를 제공한다. 상세: `platform/infra/gitea/README.md`,
+웹훅·Keycloak SSO 연동 절차를 제공한다. 콘솔에도 `PAAS_GITEA_URL` 설정 시 **Git 메뉴**가
+나타나 등록 프로젝트별 리포 바로가기를 보여준다. 상세: `platform/infra/gitea/README.md`,
 [deployment-guide.md 3.8절](./deployment-guide.md).
+
+**기업용 코드 내부 관리 강제** — `PAAS_GIT_INTERNAL_ONLY=true`로 켜면 프로젝트 등록 시
+`git_url` 호스트가 `PAAS_GITEA_URL`과 다르면 422로 거부한다(`app/git_policy.py`). internal
+LLM 프로바이더가 라벨일 뿐 강제되지 않던 문제(15절)와 같은 원칙을 소스 저장소 등록에도
+적용해, "기업용은 사내 Gitea에 올린 코드만 관리한다"는 정책이 설정이 아니라 코드로
+보장되게 했다.
 
 ### 10.3 스택 전체 라이선스 표
 
