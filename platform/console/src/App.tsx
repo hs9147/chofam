@@ -13,6 +13,7 @@ import Payments from './pages/Payments';
 import ProjectDetail from './pages/ProjectDetail';
 import Projects from './pages/Projects';
 import Providers from './pages/Providers';
+import ServerConfig from './pages/ServerConfig';
 import CodeTab from './pages/project/CodeTab';
 import DeploymentsTab from './pages/project/DeploymentsTab';
 import EnvTab from './pages/project/EnvTab';
@@ -63,6 +64,7 @@ export default function App() {
           <Route path="previews" element={<PreviewsTab />} />
         </Route>
         <Route path="/modules" element={<Modules />} />
+        <Route path="/server-config" element={<ServerConfig />} />
         <Route
           path="/orgs"
           element={

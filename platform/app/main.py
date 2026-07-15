@@ -5,7 +5,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from starlette.staticfiles import StaticFiles
 
-from .api import llm, modules, orgs, payments, previews, projects, system, webhooks
+from .api import llm, modules, orgs, payments, previews, projects, server, system, webhooks
 from .config import get_settings
 from .db import Base, engine
 from .features import enabled_features
@@ -41,6 +41,7 @@ def create_app() -> FastAPI:
     if "deploy" in features:
         app.include_router(webhooks.router)
         app.include_router(previews.router)
+        app.include_router(server.router)
     if "workspace" in features:
         app.include_router(llm.router)
     if "payment" in features:

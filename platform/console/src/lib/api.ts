@@ -19,8 +19,10 @@ import type {
   ProjectFilesOut,
   ProjectOut,
   ProjectType,
+  RedirectRule,
   ResourceItem,
   ReviewResult,
+  ServerConfigOut,
   StatusSnapshot,
 } from './types';
 
@@ -30,6 +32,28 @@ export class ApiError extends Error {
     super(detail);
     this.status = status;
   }
+}
+
+// FastAPI 422는 detail이 [{loc, msg, type}, ...] 배열 — String(array)는 "[object Object]"가
+// 되어버리므로 사람이 읽을 수 있는 메시지로 풀어낸다. 나머지 에러(409 등)는 detail이
+// 문자열이라 그대로 반환된다.
+function formatDetail(detail: unknown): string {
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail)) {
+    return detail
+      .map((d) => {
+        if (d && typeof d === 'object' && 'msg' in d) {
+          const loc = Array.isArray((d as { loc?: unknown[] }).loc)
+            ? (d as { loc: unknown[] }).loc.join('.')
+            : '';
+          const msg = String((d as { msg: unknown }).msg);
+          return loc ? `${loc}: ${msg}` : msg;
+        }
+        return JSON.stringify(d);
+      })
+      .join('; ');
+  }
+  return JSON.stringify(detail);
 }
 
 async function request<T>(
@@ -71,7 +95,7 @@ async function request<T>(
   if (!res.ok) {
     const detail =
       data && typeof data === 'object' && 'detail' in data
-        ? String((data as { detail: unknown }).detail)
+        ? formatDetail((data as { detail: unknown }).detail)
         : `HTTP ${res.status}`;
     throw new ApiError(res.status, detail);
   }
@@ -98,7 +122,7 @@ async function requestMultipart<T>(path: string, formData: FormData): Promise<T>
   if (!res.ok) {
     const detail =
       data && typeof data === 'object' && 'detail' in data
-        ? String((data as { detail: unknown }).detail)
+        ? formatDetail((data as { detail: unknown }).detail)
         : `HTTP ${res.status}`;
     throw new ApiError(res.status, detail);
   }
@@ -221,6 +245,18 @@ export const api = {
     request<PaymentOut[]>('GET', '/payments', undefined, { status, limit }),
   cancelPayment: (paymentKey: string, reason: string) =>
     request<PaymentOut>('POST', `/payments/${paymentKey}/cancel`, { reason }),
+
+  // 서버구성 (런타임/프록시 백엔드 시각화 + redirect/rewrite 규칙)
+  serverConfig: () => request<ServerConfigOut>('GET', '/server-config'),
+  listRedirects: (projectId: number) =>
+    request<RedirectRule[]>('GET', `/projects/${projectId}/redirects`),
+  createRedirect: (
+    projectId: number, from_path: string, to_path: string, kind: string, status_code: number,
+  ) =>
+    request<RedirectRule>('POST', `/projects/${projectId}/redirects`, {
+      from_path, to_path, kind, status_code,
+    }),
+  deleteRedirect: (id: number) => request<void>('DELETE', `/redirects/${id}`),
 
   // 프리뷰
   createPreview: (projectId: number, branch?: string, ttl_minutes = 60) =>

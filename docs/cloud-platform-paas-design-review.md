@@ -477,6 +477,23 @@ POST /projects/{id}/preview        DELETE /previews/{id}
   `category`/`organization_id` 추가, `GET /projects/{id}/resources`로 대화식 편집 화면에
   API(카테고리별)·공유 파일·조직별 DB를 아이템화해 표시. 콘솔 상단 수평 메뉴를 왼쪽 고정
   사이드바로 재구성(`components/Layout.tsx`)
+- **운영환경별 런타임/리버스프록시 선택 + 서버구성 시각화 구현 완료**(6.3절 규칙 2의
+  "런타임 인터페이스 교체 구조"를 리버스프록시에도 동일하게 적용): 1차(small) 안에서도
+  실행 런타임(`PAAS_RUNTIME_BACKEND`: docker | windows_service)과 리버스프록시
+  (`PAAS_PROXY_BACKEND`: caddy | iis | apache)를 서로 독립적으로 선택할 수 있게 했다.
+  `services/runtime/`가 Runtime 인터페이스로 Docker/K8s를 이미 추상화하고 있던 것과
+  같은 원칙으로, `services/proxy/`에 `ReverseProxy` 인터페이스를 신설해 기존 Caddy
+  구현을 그대로 옮기고 IIS(web.config URL Rewrite + appcmd)·Apache(VirtualHost
+  mod_proxy/mod_rewrite + apachectl)를 추가했다. windows_service 런타임은 컨테이너
+  이미지 대신 체크아웃된 리포 루트의 `paas-start.cmd`(PORT 환경변수로 리슨 포트 전달)를
+  nssm(public domain)으로 Windows Service에 등록해 기동하며, 기존 DockerRuntime과
+  동일한 -a/-b 블루-그린 패턴을 그대로 따른다. 프로젝트별 URL redirect/rewrite 규칙
+  (`RedirectRule` 모델)을 추가해 배포·롤백 시 선택된 프록시 백엔드 설정에 반영되게 했고,
+  `GET /server-config`로 현재 백엔드 선택과 프로젝트×프로필별 도메인·상태·리다이렉트
+  규칙 수를 한 화면에서 보여준다(콘솔 "서버구성" 메뉴 — "서버구성 시각화"와 "메뉴(라우팅/
+  사이트 항목)·redirect/rewrite·service 등록 관리" 요건에 대응). 런타임 상태 조회가
+  실패해도(예: docker SDK 미설치) 전체 화면이 죽지 않도록 개별 사이트 단위로 예외를
+  흡수해 "unknown"으로 표시한다.
 
 ---
 

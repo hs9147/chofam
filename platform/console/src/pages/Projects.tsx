@@ -151,15 +151,24 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
     <Modal title="새 프로젝트" onClose={onClose}>
       <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <label className="field">
-          이름 (소문자·숫자·하이픈)
-          <input value={form.name} onChange={(e) => set('name', e.target.value)} required />
+          이름 — 빈칸 없이 소문자·숫자·하이픈만 사용하세요 (예: shop-web)
+          <input
+            value={form.name}
+            onChange={(e) => set('name', e.target.value)}
+            pattern="[a-z0-9][a-z0-9-]{1,40}"
+            title="빈칸 없이 소문자·숫자·하이픈만 사용하세요 (예: shop-web)"
+            placeholder="shop-web"
+            required
+          />
         </label>
         <label className="field">
           타입
           <select value={form.type} onChange={(e) => set('type', e.target.value)}>
             <option value="react">react</option>
-            <option value="python">python</option>
+            <option value="python">python (FastAPI)</option>
+            <option value="streamlit">streamlit</option>
             <option value="node">node</option>
+            <option value="html">html (정적)</option>
             <option value="llm">llm</option>
           </select>
         </label>

@@ -1,6 +1,6 @@
 // platform/app/schemas.py 미러 — 백엔드 스키마 변경 시 이 파일을 함께 갱신한다.
 
-export type ProjectType = 'react' | 'python' | 'node' | 'llm';
+export type ProjectType = 'react' | 'python' | 'node' | 'llm' | 'html' | 'streamlit';
 export type BuildProfile = 'development' | 'release';
 export type DeploymentStatus = 'building' | 'running' | 'failed' | 'stopped';
 
@@ -126,6 +126,32 @@ export interface ProjectFilesOut {
 export interface ProjectFileContentOut {
   path: string;
   content: string;
+}
+
+// 서버구성 시각화 — 런타임/프록시 백엔드 + 등록된 사이트(라우팅 항목) 목록
+export interface ServerConfigSite {
+  project_id: number;
+  project_name: string;
+  profile: BuildProfile;
+  domain: string;
+  status: string;
+  redirect_count: number;
+}
+
+export interface ServerConfigOut {
+  runtime_backend: string;
+  proxy_backend: string;
+  sites: ServerConfigSite[];
+}
+
+export interface RedirectRule {
+  id: number;
+  project_id: number;
+  from_path: string;
+  to_path: string;
+  kind: 'redirect' | 'rewrite';
+  status_code: number;
+  created_at: string;
 }
 
 export interface AuditRow {

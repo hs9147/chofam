@@ -41,9 +41,10 @@ def test_deploy_endpoints_gated_when_disabled(monkeypatch, fresh_settings):
     pid = r.json()["id"]
     assert c.post(f"/projects/{pid}/deploy", json={}, headers=ADMIN).status_code == 404
     assert c.get(f"/projects/{pid}/deployments", headers=ADMIN).status_code == 404
-    # 웹훅·프리뷰 라우터도 미마운트
+    # 웹훅·프리뷰·서버구성 라우터도 미마운트
     assert c.post("/webhooks/git", content=b"{}").status_code == 404
     assert c.get(f"/projects/{pid}/previews", headers=ADMIN).status_code == 404
+    assert c.get("/server-config", headers=ADMIN).status_code == 404
 
 
 def test_unknown_feature_rejected(monkeypatch, fresh_settings):
