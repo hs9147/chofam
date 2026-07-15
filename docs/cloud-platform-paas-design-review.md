@@ -298,6 +298,25 @@ Organization을 함께 생성한다. 조직 소속 프로젝트(`POST /projects`
 "사용자에게 URL 등 메타 정보를 노출하지 않는다"는 요건을 충족한다. organization_id 없이
 git_url을 직접 지정하는 레거시 경로는 하위 호환을 위해 유지된다.
 
+**zip/폴더 업로드 등록 + 코드 확인 화면 + 원클릭/자동 배포 완결** — 아직 git 저장소가
+없는 코드도 프로젝트로 등록할 수 있어야 한다는 요건에 `POST /projects/upload`(조직 필수)를
+추가했다. zip 또는 폴더(다중 파일)를 올리면 `services/upload.py`가 안전하게 스테이징한 뒤
+사내 Gitea 신규 리포에 최초 커밋으로 push한다 — 대용량·악성 업로드 방어는 (1) 업로드 원본
+자체의 스트리밍 크기 상한, (2) 압축 해제 시 **zip 헤더 선언값이 아닌 실제 압축 해제
+바이트 수**로 강제하는 총량 상한(zip bomb 방어의 핵심 — 헤더는 위조 가능하므로 신뢰하지
+않는다), (3) 엔트리 수 상한, (4) 파일별 압축비 사전 점검, (5) 절대경로·상위 디렉토리
+탈출(zip slip)·심볼릭 링크 엔트리 거부로 구성했다. 조직/업로드로 만든 리포는 Gitea에
+`private:true`로 생성되므로, 플랫폼이 clone/fetch/push할 때도 `services/git_auth.py`가
+`PAAS_GITEA_API_TOKEN`을 git 프로세스에 `http.extraHeader`로 주입해 인증한다(git_url 자체엔
+토큰을 심지 않음) — 이는 앞서 구현된 조직별 작업공간의 잠재 버그(비공개 리포를 플랫폼이
+스스로 clone하지 못하던 문제)를 함께 고친 것이기도 하다. 코드 **수정**은 여전히 12절 원칙대로
+LLM 채팅 → diff 제안 → 승인(`POST /changes/{id}/apply`)으로만 가능하지만, 코드 **확인**을
+위한 읽기 전용 파일 트리·내용 조회 API(`GET /projects/{id}/files`, `/files/content`)와
+콘솔 코드 탭을 추가해 저장/수정 엔드포인트 없이도 현재 코드를 볼 수 있게 했다. 마지막으로
+자동 배포의 남은 수동 단계였던 Gitea 웹훅 등록을 `PAAS_PLATFORM_PUBLIC_URL` 설정 시
+리포 생성 때마다 플랫폼이 스스로 등록하도록 자동화했다(베스트 에포트 — 실패해도 프로젝트
+생성 자체는 성공 처리, 미설정 시 `infra/gitea/README.md`의 수동 절차로 대체 가능).
+
 ### 10.3 스택 전체 라이선스 표
 
 | 구성 요소 | 도구 | 라이선스 | 판정 |
@@ -441,6 +460,10 @@ POST /projects/{id}/preview        DELETE /previews/{id}
   대화식 편집(diff 제안 → 승인 시에만 커밋), 코드 리뷰(심각도 분류), Module 레지스트리
   4타입(민감 config 암호화·티어별 internal_api URL 해석·배포 시 자동 주입),
   TTL PreviewSession(CPU 50%·GPU 금지·동시 5개 제한·lazy 회수)
+- **zip/폴더 업로드 등록 + 코드 확인 화면 + 웹훅 자동 등록 구현 완료**(10.2절):
+  `POST /projects/upload`(zip bomb/zip slip 방어), 읽기 전용 파일 트리·내용 조회 API +
+  콘솔 코드 탭(수정은 여전히 채팅/diff 승인으로만), 사내 Gitea private 리포 clone/fetch/push
+  인증(`services/git_auth.py`), `PAAS_PLATFORM_PUBLIC_URL` 설정 시 웹훅 자동 등록
 
 ---
 

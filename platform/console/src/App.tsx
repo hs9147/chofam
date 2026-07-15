@@ -13,6 +13,7 @@ import Payments from './pages/Payments';
 import ProjectDetail from './pages/ProjectDetail';
 import Projects from './pages/Projects';
 import Providers from './pages/Providers';
+import CodeTab from './pages/project/CodeTab';
 import DeploymentsTab from './pages/project/DeploymentsTab';
 import EnvTab from './pages/project/EnvTab';
 import LogsTab from './pages/project/LogsTab';
@@ -54,6 +55,7 @@ export default function App() {
         <Route path="/projects/:id" element={<ProjectDetail />}>
           <Route index element={<Navigate to="overview" replace />} />
           <Route path="overview" element={<OverviewTab />} />
+          <Route path="code" element={<CodeTab />} />
           <Route path="deployments" element={<DeploymentsTab />} />
           <Route path="logs" element={<LogsTab />} />
           <Route path="env" element={<EnvTab />} />

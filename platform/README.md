@@ -99,6 +99,11 @@ GET  /orgs                            # 조직 목록 + 프로젝트 수
 GET  /projects                        # git_url은 organization_id 소속이면 비관리자에게 마스킹
 POST /projects                        # {name, type, branch, domain?, ...}
                                       #   + organization_id(내부 리포 자동 생성) 또는 git_url(직접 지정) 중 하나
+POST /projects/upload                 # multipart: zip_file 또는 files[](폴더) 중 하나 + organization_id 필수
+                                      #   업로드 내용을 사내 Gitea 신규 리포에 최초 push (대용량/zip bomb/zip slip 방어)
+                                      #   deploy_after_upload=true면 push 직후 배포 큐에 등록(원클릭)
+GET  /projects/{id}/files             # 읽기 전용 파일 트리 (workspace 기능)
+GET  /projects/{id}/files/content?path=  # 읽기 전용 파일 내용 — 수정 엔드포인트는 없음(채팅/diff로만)
 POST /projects/{id}/deploy            # {profile?: development|release, git_sha?}
 POST /projects/{id}/rollback?profile=release
 POST /projects/{id}/stop?profile=development
@@ -174,9 +179,11 @@ npm run build        # tsc 타입체크 + vite build → dist/
 
 - 접속: `http://<서버>:7000/console/` → API 키로 로그인
   (admin 키: 대시보드·감사 로그·키 발급·프로바이더 등록 포함, 일반 키: 프로젝트 운영 화면)
-- 화면: 시스템 대시보드(CPU/메모리/디스크/GPU 게이지, 키 발급), 프로젝트(생성·dev/release
-  배포·롤백·중지·배포 이력·로그 3초 폴링·환경변수·모듈 바인딩·프리뷰), 모듈 레지스트리,
-  LLM 프로바이더, 대화식 코드 편집(diff 뷰 + 승인/거절 + 브랜치 리뷰), 감사 로그
+- 화면: 시스템 대시보드(CPU/메모리/디스크/GPU 게이지, 키 발급), 프로젝트(생성 시 git_url 직접
+  입력/조직 소속 자동 생성/zip·폴더 업로드 3가지 방식 선택, dev/release 배포·롤백·중지·배포
+  이력·로그 3초 폴링·환경변수·모듈 바인딩·프리뷰), 코드 확인(읽기 전용 파일 트리·내용 뷰어 —
+  수정은 채팅 탭에서 diff로만), 모듈 레지스트리, LLM 프로바이더,
+  대화식 코드 편집(diff 뷰 + 승인/거절 + 브랜치 리뷰), 감사 로그
 - 인증은 `x-api-key`를 sessionStorage에 보관(기존 admin/mail 관례). 로그인 검증은 admin 전용
   `GET /status` 응답 코드(200 admin / 403 일반 / 401 무효)를 프로브로 재사용
 - 의존성: react·react-dom·react-router-dom (전부 MIT). 라우팅은 해시 기반이라 새로고침·딥링크에
@@ -196,6 +203,25 @@ npm run build        # tsc 타입체크 + vite build → dist/
   리포를 플랫폼이 내부에서 자동 생성·관리하며, git_url 등 메타 정보는 **일반 사용자
   응답에서 마스킹**된다(admin만 실제 값 조회 가능) — `POST /orgs`, `GET /orgs`,
   `POST /projects`의 `organization_id` 참고.
+- **zip/폴더 업로드 등록**: `POST /projects/upload`(조직 필수) — git 저장소가 아직 없는
+  코드를 zip 또는 폴더(다중 파일)로 올리면 플랫폼이 사내 Gitea에 신규 리포를 만들어
+  최초 커밋으로 push한다. 대용량·악성 업로드 방어(`app/services/upload.py`):
+  업로드 원본 스트리밍 크기 상한(`PAAS_UPLOAD_MAX_ZIP_MB`), 압축 해제 시 실제 바이트
+  기준 총량 상한(`PAAS_UPLOAD_MAX_UNCOMPRESSED_MB`, zip 헤더 선언값을 신뢰하지 않음),
+  엔트리 수 상한(`PAAS_UPLOAD_MAX_FILES`), 파일별 압축비 상한(`PAAS_UPLOAD_MAX_COMPRESSION_RATIO`),
+  절대경로·상위 디렉토리 탈출(zip slip)·심볼릭 링크 엔트리 거부. `deploy_after_upload`로
+  push 직후 배포까지 원클릭 진행 가능.
+- **코드 확인 화면**: `GET /projects/{id}/files`, `/files/content`로 리포를 읽기 전용
+  브라우징. 저장/수정 엔드포인트는 존재하지 않으며, 실제 코드 변경은 항상 LLM 채팅 →
+  diff 제안 → `POST /changes/{id}/apply` 승인 경로로만 이뤄진다(12절 원칙 유지).
+- **웹훅 자동 등록**: `PAAS_PLATFORM_PUBLIC_URL` 설정 시 조직 소속/업로드로 리포를 만들
+  때마다 플랫폼이 자신의 `/webhooks/git`을 Gitea 웹훅으로 자동 등록한다(베스트 에포트 —
+  실패해도 프로젝트 생성은 성공 처리). 비워두면 기존처럼 `infra/gitea/README.md`의
+  수동 웹훅 설정이 필요하다.
+- **Gitea private 리포 인증**: 조직/업로드로 생성된 리포는 Gitea에 `private:true`로
+  생성되므로, 플랫폼이 직접 clone/fetch/push할 때도 `PAAS_GITEA_API_TOKEN`을 git
+  프로세스에 `http.extraHeader`로 주입해 인증한다(`app/services/git_auth.py`) —
+  git_url 자체에는 토큰을 심지 않는다.
 - **OIDC/RBAC (Keycloak 호환)**: `PAAS_OIDC_ISSUER` 설정 시 `Authorization: Bearer <JWT>`
   인증 병행. `realm_access.roles`에 `PAAS_OIDC_ADMIN_ROLE`(기본 paas-admin)이 있으면 admin.
 - **비동기 배포**: `POST /projects/{id}/deploy`에 `"wait": false` → 202 즉시 반환,

@@ -15,7 +15,10 @@ import type {
   OrgOut,
   PreviewOut,
   ProjectCreate,
+  ProjectFileContentOut,
+  ProjectFilesOut,
   ProjectOut,
+  ProjectType,
   ReviewResult,
   StatusSnapshot,
 } from './types';
@@ -74,6 +77,33 @@ async function request<T>(
   return data as T;
 }
 
+async function requestMultipart<T>(path: string, formData: FormData): Promise<T> {
+  const res = await fetch(path, {
+    method: 'POST',
+    headers: { 'x-api-key': getKey() },
+    body: formData,
+  });
+  if (res.status === 401) {
+    logout();
+    window.location.hash = '#/login';
+    throw new ApiError(401, '인증이 만료되었습니다. 다시 로그인하세요.');
+  }
+  let data: unknown = null;
+  try {
+    data = await res.json();
+  } catch {
+    /* 본문 없는 응답 */
+  }
+  if (!res.ok) {
+    const detail =
+      data && typeof data === 'object' && 'detail' in data
+        ? String((data as { detail: unknown }).detail)
+        : `HTTP ${res.status}`;
+    throw new ApiError(res.status, detail);
+  }
+  return data as T;
+}
+
 export const api = {
   // 시스템
   health: () => request<HealthInfo>('GET', '/health'),
@@ -85,6 +115,39 @@ export const api = {
   // 프로젝트
   listProjects: () => request<ProjectOut[]>('GET', '/projects'),
   createProject: (body: ProjectCreate) => request<ProjectOut>('POST', '/projects', body),
+
+  // zip/폴더 업로드로 프로젝트 등록 (조직 필수 — 사내 Gitea 리포로 최초 push)
+  uploadProject: (
+    form: {
+      name: string;
+      type: ProjectType;
+      organization_id: number;
+      branch: string;
+      domain?: string;
+      health_check_path?: string;
+      default_profile: BuildProfile;
+      deploy_after_upload: boolean;
+    },
+    source: { kind: 'zip'; file: File } | { kind: 'folder'; files: FileList },
+  ) => {
+    const fd = new FormData();
+    fd.append('name', form.name);
+    fd.append('type', form.type);
+    fd.append('organization_id', String(form.organization_id));
+    fd.append('branch', form.branch);
+    if (form.domain) fd.append('domain', form.domain);
+    fd.append('health_check_path', form.health_check_path ?? '/');
+    fd.append('default_profile', form.default_profile);
+    fd.append('deploy_after_upload', String(form.deploy_after_upload));
+    if (source.kind === 'zip') {
+      fd.append('zip_file', source.file);
+    } else {
+      Array.from(source.files).forEach((f) => {
+        fd.append('files', f, f.webkitRelativePath || f.name);
+      });
+    }
+    return requestMultipart<ProjectOut>('/projects/upload', fd);
+  },
 
   // 조직 (사내 Gitea 작업공간)
   listOrgs: () => request<OrgOut[]>('GET', '/orgs'),
@@ -106,6 +169,11 @@ export const api = {
   listEnv: (id: number) => request<EnvVarRow[]>('GET', `/projects/${id}/env`),
   setEnv: (id: number, key: string, value: string, is_secret: boolean) =>
     request<void>('PUT', `/projects/${id}/env`, { key, value, is_secret }),
+
+  // 코드 확인 화면 (읽기 전용 — 수정은 채팅/diff 승인으로만)
+  projectFiles: (id: number) => request<ProjectFilesOut>('GET', `/projects/${id}/files`),
+  projectFileContent: (id: number, path: string) =>
+    request<ProjectFileContentOut>('GET', `/projects/${id}/files/content`, undefined, { path }),
 
   // 모듈
   listModules: () => request<ModuleOut[]>('GET', '/modules'),

@@ -30,6 +30,7 @@ from ..security import encrypt_value, require_admin, require_api_key
 from ..services import llm as llm_service
 from ..services import modules as modules_service
 from ..services import workspace
+from ..services.build import BuildError, checkout
 
 router = APIRouter(tags=["llm"])
 
@@ -197,6 +198,47 @@ def reject_change(
         raise HTTPException(status_code=404, detail="change not found")
     change.status = ChangeStatus.rejected
     db.commit()
+
+
+@router.get("/projects/{project_id}/files")
+def project_files(
+    project_id: int,
+    db: Session = Depends(get_db),
+    _: ApiKey = Depends(require_api_key),
+):
+    """읽기 전용 파일 트리 — 코드 확인 화면. 실제 수정은 채팅/diff 승인 플로우로만 이뤄진다."""
+    project = db.get(Project, project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="project not found")
+    try:
+        workdir, _sha = checkout(project)
+    except BuildError as e:
+        raise HTTPException(status_code=502, detail=str(e)[:1000])
+    return {"files": workspace.file_tree(workdir)}
+
+
+@router.get("/projects/{project_id}/files/content")
+def project_file_content(
+    project_id: int,
+    path: str,
+    db: Session = Depends(get_db),
+    _: ApiKey = Depends(require_api_key),
+):
+    """읽기 전용 단일 파일 내용 — 코드 확인 화면. 저장·수정 엔드포인트는 존재하지 않는다."""
+    project = db.get(Project, project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="project not found")
+    try:
+        workdir, _sha = checkout(project)
+    except BuildError as e:
+        raise HTTPException(status_code=502, detail=str(e)[:1000])
+    try:
+        content = workspace.read_file(workdir, path)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="file not found")
+    except ValueError as e:
+        raise HTTPException(status_code=413, detail=str(e))
+    return {"path": path, "content": content}
 
 
 @router.post("/projects/{project_id}/review")

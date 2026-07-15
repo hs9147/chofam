@@ -17,6 +17,7 @@ from pathlib import Path
 
 from ..config import get_settings
 from ..models import BuildProfile, Project, ProjectType
+from .git_auth import auth_args
 
 TEMPLATE_DIR = Path(__file__).resolve().parent.parent.parent / "templates" / "dockerfiles"
 
@@ -131,9 +132,10 @@ def checkout(project: Project, git_sha: str | None = None) -> tuple[Path, str]:
     workdir = settings.work_dir / project.name
     if not (workdir / ".git").exists():
         shutil.rmtree(workdir, ignore_errors=True)
-        _run_git(["clone", "--branch", project.branch, project.git_url, str(workdir)])
+        _run_git(["clone", "--branch", project.branch, project.git_url, str(workdir)],
+                  git_url=project.git_url)
     else:
-        _run_git(["fetch", "origin", project.branch], cwd=workdir)
+        _run_git(["fetch", "origin", project.branch], cwd=workdir, git_url=project.git_url)
         _run_git(["checkout", project.branch], cwd=workdir)
         _run_git(["reset", "--hard", f"origin/{project.branch}"], cwd=workdir)
     if git_sha:
@@ -144,7 +146,8 @@ def checkout(project: Project, git_sha: str | None = None) -> tuple[Path, str]:
     return workdir, out.stdout.strip()
 
 
-def _run_git(args: list[str], cwd: Path | None = None) -> None:
-    proc = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True)
+def _run_git(args: list[str], cwd: Path | None = None, git_url: str | None = None) -> None:
+    auth = auth_args(git_url) if git_url else []
+    proc = subprocess.run(["git", *auth, *args], cwd=cwd, capture_output=True, text=True)
     if proc.returncode != 0:
         raise BuildError(f"git {args[0]} failed: {proc.stderr.strip()[:500]}")

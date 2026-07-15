@@ -39,12 +39,16 @@ def ensure_org(name: str) -> None:
     raise GiteaError(f"Gitea 조직 생성 실패 (HTTP {res.status_code}): {res.text[:300]}")
 
 
-def ensure_repo(org_name: str, repo_name: str) -> str:
-    """조직 아래 리포가 없으면 생성하고, 이미 있으면 조회해서 clone URL을 반환한다."""
+def ensure_repo(org_name: str, repo_name: str, auto_init: bool = True) -> str:
+    """조직 아래 리포가 없으면 생성하고, 이미 있으면 조회해서 clone URL을 반환한다.
+
+    auto_init=False는 업로드 등록 경로용 — 플랫폼이 스테이징한 내용을 최초
+    커밋으로 직접 push하므로 Gitea 쪽에서 빈 초기 커밋을 만들면 안 된다.
+    """
     base, headers = _base_and_headers()
     res = httpx.post(
         f"{base}/api/v1/orgs/{org_name}/repos", headers=headers,
-        json={"name": repo_name, "private": True, "auto_init": True}, timeout=15,
+        json={"name": repo_name, "private": True, "auto_init": auto_init}, timeout=15,
     )
     if res.status_code == 201:
         return res.json()["clone_url"]
@@ -54,3 +58,35 @@ def ensure_repo(org_name: str, repo_name: str) -> str:
             return got.json()["clone_url"]
         raise GiteaError(f"Gitea 리포 조회 실패 (HTTP {got.status_code}): {got.text[:300]}")
     raise GiteaError(f"Gitea 리포 생성 실패 (HTTP {res.status_code}): {res.text[:300]}")
+
+
+def ensure_webhook(org_name: str, repo_name: str) -> None:
+    """리포에 플랫폼 push 웹훅이 없으면 등록한다(멱등) — 수동 설정 없이 자동 배포가 되도록.
+
+    PAAS_PLATFORM_PUBLIC_URL이 비어 있으면 플랫폼 자신의 주소를 알 수 없으므로
+    조용히 건너뛴다(infra/gitea/README.md의 수동 절차로 대체 가능).
+    """
+    settings = get_settings()
+    if not settings.platform_public_url:
+        return
+    base, headers = _base_and_headers()
+    hook_url = f"{settings.platform_public_url.rstrip('/')}/webhooks/git"
+
+    existing = httpx.get(f"{base}/api/v1/repos/{org_name}/{repo_name}/hooks", headers=headers, timeout=15)
+    if existing.status_code == 200 and any(
+        h.get("config", {}).get("url") == hook_url for h in existing.json()
+    ):
+        return  # 이미 등록됨
+
+    res = httpx.post(
+        f"{base}/api/v1/repos/{org_name}/{repo_name}/hooks", headers=headers,
+        json={
+            "type": "gitea",
+            "config": {"url": hook_url, "content_type": "json", "secret": settings.webhook_secret},
+            "events": ["push"],
+            "active": True,
+        },
+        timeout=15,
+    )
+    if res.status_code not in (200, 201):
+        raise GiteaError(f"Gitea 웹훅 등록 실패 (HTTP {res.status_code}): {res.text[:300]}")

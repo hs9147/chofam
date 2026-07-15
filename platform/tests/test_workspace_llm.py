@@ -93,3 +93,31 @@ def test_context_files_guardrails(tmp_path):
     (repo / "bin.dat").write_text("data")
     files = workspace.read_context_files(repo, ["hello.py", "big.py", "bin.dat", "../escape"])
     assert list(files) == ["hello.py"]
+
+
+def test_read_file_returns_content(tmp_path):
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    assert workspace.read_file(repo, "hello.py") == 'print("hello")\n'
+
+
+def test_read_file_rejects_path_escape(tmp_path):
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    with pytest.raises(FileNotFoundError):
+        workspace.read_file(repo, "../escape")
+
+
+def test_read_file_rejects_missing_file(tmp_path):
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    with pytest.raises(FileNotFoundError):
+        workspace.read_file(repo, "nope.py")
+
+
+def test_read_file_rejects_oversized_file(tmp_path):
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "huge.py").write_text("x" * (workspace.MAX_VIEW_FILE_BYTES + 1))
+    with pytest.raises(ValueError):
+        workspace.read_file(repo, "huge.py")

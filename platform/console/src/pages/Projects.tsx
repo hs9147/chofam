@@ -73,6 +73,11 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
     health_check_path: '/',
     default_profile: 'release' as BuildProfile,
   });
+  const [uploadMode, setUploadMode] = useState(false); // zip/폴더 업로드 (조직 소속 시에만)
+  const [uploadKind, setUploadKind] = useState<'zip' | 'folder'>('zip');
+  const [zipFile, setZipFile] = useState<File | null>(null);
+  const [folderFiles, setFolderFiles] = useState<FileList | null>(null);
+  const [deployAfterUpload, setDeployAfterUpload] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -81,8 +86,45 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setBusy(true);
     setError('');
+
+    if (usingOrg && uploadMode) {
+      const source: { kind: 'zip'; file: File } | { kind: 'folder'; files: FileList } | null =
+        uploadKind === 'zip'
+          ? zipFile
+            ? { kind: 'zip', file: zipFile }
+            : null
+          : folderFiles && folderFiles.length > 0
+            ? { kind: 'folder', files: folderFiles }
+            : null;
+      if (!source) {
+        setError(uploadKind === 'zip' ? 'zip 파일을 선택하세요.' : '폴더를 선택하세요.');
+        return;
+      }
+      setBusy(true);
+      try {
+        await api.uploadProject(
+          {
+            name: form.name,
+            type: form.type,
+            organization_id: Number(form.organization_id),
+            branch: form.branch,
+            domain: form.domain || undefined,
+            health_check_path: form.health_check_path,
+            default_profile: form.default_profile,
+            deploy_after_upload: deployAfterUpload,
+          },
+          source,
+        );
+        onCreated();
+      } catch (err) {
+        setError((err as Error).message);
+        setBusy(false);
+      }
+      return;
+    }
+
+    setBusy(true);
     const payload: ProjectCreate = {
       name: form.name,
       type: form.type,
@@ -144,6 +186,67 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
             <input value={form.git_url} onChange={(e) => set('git_url', e.target.value)} required />
           </label>
         )}
+        {usingOrg && (
+          <label className="field" style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <input
+              type="checkbox"
+              checked={uploadMode}
+              onChange={(e) => setUploadMode(e.target.checked)}
+            />
+            git 리포 대신 zip/폴더를 직접 업로드
+          </label>
+        )}
+        {usingOrg && uploadMode && (
+          <div className="panel" style={{ padding: 12, margin: 0 }}>
+            <div className="row" style={{ marginBottom: 8 }}>
+              <label className="field" style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <input
+                  type="radio"
+                  name="uploadKind"
+                  checked={uploadKind === 'zip'}
+                  onChange={() => setUploadKind('zip')}
+                />
+                zip 파일
+              </label>
+              <label className="field" style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <input
+                  type="radio"
+                  name="uploadKind"
+                  checked={uploadKind === 'folder'}
+                  onChange={() => setUploadKind('folder')}
+                />
+                폴더
+              </label>
+            </div>
+            {uploadKind === 'zip' ? (
+              <input
+                type="file"
+                accept=".zip"
+                onChange={(e) => setZipFile(e.target.files?.[0] ?? null)}
+              />
+            ) : (
+              <input
+                type="file"
+                multiple
+                ref={(el) => {
+                  if (el) el.setAttribute('webkitdirectory', '');
+                }}
+                onChange={(e) => setFolderFiles(e.target.files)}
+              />
+            )}
+            <label
+              className="field"
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 }}
+            >
+              <input
+                type="checkbox"
+                checked={deployAfterUpload}
+                onChange={(e) => setDeployAfterUpload(e.target.checked)}
+              />
+              업로드 완료 후 바로 배포 (원클릭)
+            </label>
+          </div>
+        )}
 
         <div className="row">
           <label className="field" style={{ flex: 1 }}>
@@ -178,7 +281,7 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
             취소
           </button>
           <button type="submit" disabled={busy}>
-            {busy ? '생성 중...' : '생성'}
+            {busy ? (usingOrg && uploadMode ? '업로드 중...' : '생성 중...') : '생성'}
           </button>
         </div>
       </form>

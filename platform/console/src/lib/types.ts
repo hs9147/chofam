@@ -108,6 +108,15 @@ export interface PreviewOut {
   expires_at: string;
 }
 
+export interface ProjectFilesOut {
+  files: string[];
+}
+
+export interface ProjectFileContentOut {
+  path: string;
+  content: string;
+}
+
 export interface AuditRow {
   actor: string;
   action: string;

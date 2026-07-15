@@ -43,6 +43,21 @@ class ProjectCreate(BaseModel):
         return self
 
 
+class ProjectUploadForm(BaseModel):
+    """zip/폴더 업로드 등록용 폼 필드. git_url은 항상 조직 소속 사내 Gitea 리포로
+    플랫폼이 생성하므로 organization_id가 필수다(레거시 git_url 직접 지정 경로 없음)."""
+
+    name: str = Field(pattern=r"^[a-z0-9][a-z0-9-]{1,40}$")
+    type: ProjectType
+    organization_id: int
+    branch: str = "main"
+    domain: str | None = None
+    health_check_path: str = "/"
+    default_profile: BuildProfile = BuildProfile.release
+    # 업로드·최초 push 완료 직후 바로 배포 큐에 올릴지 여부 (원클릭 배포)
+    deploy_after_upload: bool = False
+
+
 class ProjectOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
