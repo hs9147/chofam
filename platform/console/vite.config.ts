@@ -5,7 +5,7 @@ import { defineConfig } from 'vite';
 // 백엔드에 공통 /api prefix가 없으므로 라우터 prefix를 열거해 프록시한다
 const API_PREFIXES = [
   '/projects', '/modules', '/llm', '/chat', '/changes', '/previews',
-  '/status', '/audit', '/keys', '/health', '/webhooks',
+  '/status', '/audit', '/keys', '/health', '/webhooks', '/orgs',
 ];
 
 export default defineConfig({

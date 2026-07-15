@@ -5,7 +5,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from starlette.staticfiles import StaticFiles
 
-from .api import llm, modules, payments, previews, projects, system, webhooks
+from .api import llm, modules, orgs, payments, previews, projects, system, webhooks
 from .config import get_settings
 from .db import Base, engine
 from .features import enabled_features
@@ -34,6 +34,7 @@ def create_app() -> FastAPI:
     # core — 항상 켜짐 (projects 안의 배포 계열 엔드포인트는 require_feature("deploy")로 게이트)
     app.include_router(system.router)
     app.include_router(projects.router)
+    app.include_router(orgs.router)
     app.include_router(modules.router)
 
     # 선택 모듈 (설치 빌드옵션)

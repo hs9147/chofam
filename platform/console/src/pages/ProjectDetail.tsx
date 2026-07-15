@@ -11,6 +11,7 @@ export interface ProjectContext {
 
 const TABS = [
   ['overview', '개요'],
+  ['code', '코드'],
   ['deployments', '배포 이력'],
   ['logs', '로그'],
   ['env', '환경변수'],

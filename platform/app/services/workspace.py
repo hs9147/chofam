@@ -15,6 +15,7 @@ CONTEXT_EXTENSIONS = {
     ".py", ".js", ".jsx", ".ts", ".tsx", ".json", ".md", ".html", ".css",
     ".yml", ".yaml", ".toml", ".txt", ".sql", ".sh",
 }
+MAX_VIEW_FILE_BYTES = 300_000
 
 
 def workdir_for(project: Project) -> Path:
@@ -50,6 +51,18 @@ def read_context_files(workdir: Path, paths: list[str]) -> dict[str, str]:
             continue
         result[rel] = p.read_text(encoding="utf-8", errors="replace")
     return result
+
+
+def read_file(workdir: Path, rel: str) -> str:
+    """코드 확인 화면용 단일 파일 조회(읽기 전용). 경로 탈출·과대 파일을 차단한다."""
+    root = workdir.resolve()
+    p = (root / rel).resolve()
+    if not p.is_relative_to(root) or not p.is_file():
+        raise FileNotFoundError(rel)
+    size = p.stat().st_size
+    if size > MAX_VIEW_FILE_BYTES:
+        raise ValueError(f"파일이 너무 큽니다 ({size} bytes, 최대 {MAX_VIEW_FILE_BYTES})")
+    return p.read_text(encoding="utf-8", errors="replace")
 
 
 def apply_diff(workdir: Path, diff: str, message: str) -> str:

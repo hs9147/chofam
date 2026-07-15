@@ -279,6 +279,44 @@ created_at
 Gitea 선택 시: 배포 서버의 GitHub Webhook 처리(3.6절)는 Gitea 웹훅과 페이로드 형식이 거의 동일해
 (HMAC 서명 헤더만 `X-Gitea-Signature`) 코드 수정이 최소화됩니다.
 
+**구현 완료** — `platform/infra/gitea/`에 1차(Docker Compose)·2차(K8s manifests) 배포 산출물과
+웹훅·Keycloak SSO 연동 절차를 제공한다. 콘솔에도 `PAAS_GITEA_URL` 설정 시 **Git 메뉴**가
+나타나 등록 프로젝트별 리포 바로가기를 보여준다. 상세: `platform/infra/gitea/README.md`,
+[deployment-guide.md 3.8절](./deployment-guide.md).
+
+**기업용 코드 내부 관리 강제** — `PAAS_GIT_INTERNAL_ONLY=true`로 켜면 프로젝트 등록 시
+`git_url` 호스트가 `PAAS_GITEA_URL`과 다르면 422로 거부한다(`app/git_policy.py`). internal
+LLM 프로바이더가 라벨일 뿐 강제되지 않던 문제(15절)와 같은 원칙을 소스 저장소 등록에도
+적용해, "기업용은 사내 Gitea에 올린 코드만 관리한다"는 정책이 설정이 아니라 코드로
+보장되게 했다.
+
+**조직별 작업공간 + 리포 내부 생성** — `Organization` 모델 추가(`app/models.py`).
+콘솔 조직 페이지(admin)에서 조직을 만들면 `services/gitea.py`가 사내 Gitea에 동일한
+Organization을 함께 생성한다. 조직 소속 프로젝트(`POST /projects`의 `organization_id`)는
+리포 생성 자체를 플랫폼이 Gitea API로 대신 수행하므로 사용자가 Git 주소를 다루지 않는다.
+`ProjectOut.git_url`은 비관리자 응답에서 `"(내부 관리 — 관리자만 조회 가능)"`으로 마스킹되어
+"사용자에게 URL 등 메타 정보를 노출하지 않는다"는 요건을 충족한다. organization_id 없이
+git_url을 직접 지정하는 레거시 경로는 하위 호환을 위해 유지된다.
+
+**zip/폴더 업로드 등록 + 코드 확인 화면 + 원클릭/자동 배포 완결** — 아직 git 저장소가
+없는 코드도 프로젝트로 등록할 수 있어야 한다는 요건에 `POST /projects/upload`(조직 필수)를
+추가했다. zip 또는 폴더(다중 파일)를 올리면 `services/upload.py`가 안전하게 스테이징한 뒤
+사내 Gitea 신규 리포에 최초 커밋으로 push한다 — 대용량·악성 업로드 방어는 (1) 업로드 원본
+자체의 스트리밍 크기 상한, (2) 압축 해제 시 **zip 헤더 선언값이 아닌 실제 압축 해제
+바이트 수**로 강제하는 총량 상한(zip bomb 방어의 핵심 — 헤더는 위조 가능하므로 신뢰하지
+않는다), (3) 엔트리 수 상한, (4) 파일별 압축비 사전 점검, (5) 절대경로·상위 디렉토리
+탈출(zip slip)·심볼릭 링크 엔트리 거부로 구성했다. 조직/업로드로 만든 리포는 Gitea에
+`private:true`로 생성되므로, 플랫폼이 clone/fetch/push할 때도 `services/git_auth.py`가
+`PAAS_GITEA_API_TOKEN`을 git 프로세스에 `http.extraHeader`로 주입해 인증한다(git_url 자체엔
+토큰을 심지 않음) — 이는 앞서 구현된 조직별 작업공간의 잠재 버그(비공개 리포를 플랫폼이
+스스로 clone하지 못하던 문제)를 함께 고친 것이기도 하다. 코드 **수정**은 여전히 12절 원칙대로
+LLM 채팅 → diff 제안 → 승인(`POST /changes/{id}/apply`)으로만 가능하지만, 코드 **확인**을
+위한 읽기 전용 파일 트리·내용 조회 API(`GET /projects/{id}/files`, `/files/content`)와
+콘솔 코드 탭을 추가해 저장/수정 엔드포인트 없이도 현재 코드를 볼 수 있게 했다. 마지막으로
+자동 배포의 남은 수동 단계였던 Gitea 웹훅 등록을 `PAAS_PLATFORM_PUBLIC_URL` 설정 시
+리포 생성 때마다 플랫폼이 스스로 등록하도록 자동화했다(베스트 에포트 — 실패해도 프로젝트
+생성 자체는 성공 처리, 미설정 시 `infra/gitea/README.md`의 수동 절차로 대체 가능).
+
 ### 10.3 스택 전체 라이선스 표
 
 | 구성 요소 | 도구 | 라이선스 | 판정 |
@@ -364,6 +402,15 @@ Gitea 선택 시: 배포 서버의 GitHub Webhook 처리(3.6절)는 Gitea 웹훅
   모듈 참조로 연결하면 1차→2차 전환 시 주소 체계가 바뀌어도 코드 수정이 없다(6.3절 규칙 4와 합치).
 - **LLM 연계가 모듈화의 실익**: 채팅 컨텍스트에 바인딩된 모듈 목록·스키마를 제공하면
   "등록된 결제 모듈로 결제 연동 코드 짜줘"가 환경변수 규약에 맞는 코드로 바로 생성된다.
+- **자원 아이템화 리스팅(구현 완료)**: 대화식 편집 화면에서 "이 프로젝트에서 뭘 쓸 수 있는지"를
+  바인딩 여부와 무관하게 미리 볼 수 있도록 `GET /projects/{id}/resources`를 추가했다. Module에
+  `category`(자유 텍스트 — "news", "llm" 등 API를 카테고리별로 묶는 용도)와 `organization_id`
+  (지정 시 해당 조직 프로젝트에만 노출 — "조직별 DB" 같은 조직 전용 자원)를 추가해, 콘솔 채팅
+  화면이 API(카테고리별)·서버내 공유 파일(file_storage)·DB(조직별 포함)를 아이템화해 보여준다.
+  실제 LLM 프롬프트 컨텍스트(`context_for_llm`)는 기존대로 **바인딩된 모듈만** 주입한다 —
+  이 리스팅은 사용자가 무엇을 바인딩할지 판단하기 위한 참고용이며, LLM이 실제로 배포 시
+  주입되지 않는 미바인딩 자원을 코드에서 참조하도록 유도하지 않기 위해 컨텍스트 주입 범위는
+  분리해 두었다.
 
 ### 12.3 실행 결과 미리보기
 
@@ -422,6 +469,14 @@ POST /projects/{id}/preview        DELETE /previews/{id}
   대화식 편집(diff 제안 → 승인 시에만 커밋), 코드 리뷰(심각도 분류), Module 레지스트리
   4타입(민감 config 암호화·티어별 internal_api URL 해석·배포 시 자동 주입),
   TTL PreviewSession(CPU 50%·GPU 금지·동시 5개 제한·lazy 회수)
+- **zip/폴더 업로드 등록 + 코드 확인 화면 + 웹훅 자동 등록 구현 완료**(10.2절):
+  `POST /projects/upload`(zip bomb/zip slip 방어), 읽기 전용 파일 트리·내용 조회 API +
+  콘솔 코드 탭(수정은 여전히 채팅/diff 승인으로만), 사내 Gitea private 리포 clone/fetch/push
+  인증(`services/git_auth.py`), `PAAS_PLATFORM_PUBLIC_URL` 설정 시 웹훅 자동 등록
+- **자원 아이템화 리스팅 + 콘솔 좌측 사이드바 전환 구현 완료**(12.2절): Module에
+  `category`/`organization_id` 추가, `GET /projects/{id}/resources`로 대화식 편집 화면에
+  API(카테고리별)·공유 파일·조직별 DB를 아이템화해 표시. 콘솔 상단 수평 메뉴를 왼쪽 고정
+  사이드바로 재구성(`components/Layout.tsx`)
 
 ---
 
@@ -482,3 +537,23 @@ POST /projects/{id}/preview        DELETE /previews/{id}
 - GPU 예약제: VRAM 사전 검사(3.5절) + 시간대별 GPU 공유 스케줄
 - 사내 표준 스캐폴드: 조직 표준 Dockerfile·CI 포함 프로젝트 생성기
 - DR 자동화: DB·Fernet 키 백업 + 복구 리허설, 헬스체크 기반 상태 페이지 자동 생성
+
+---
+
+## 15. 데이터 유출 보안 점검 및 조치
+
+"자료가 외부로 유출되지 않는가"를 코드 레벨(리포 공개 설정이 아니라 실제 네트워크 전송 경로)로
+점검했다. GitHub 리포(`hs9147/chofam`)는 private로 확인됨. 코드 감사에서 발견된 실질적 위험
+3건은 전부 수정 완료했다.
+
+| # | 위험 | 조치 | 파일 |
+| --- | --- | --- | --- |
+| 1 | GitOps 매니페스트에 프로젝트 시크릿(EnvVar·Module `*_API_KEY`/`*_DSN`)이 평문으로 포함되어 admin이 설정한 외부 git 리포에 그대로 커밋·푸시됨 — 키 회전 후에도 과거 커밋에 영구히 남음 | `RuntimeSpec.secret_keys`로 시크릿 키를 별도 추적, K8s 매니페스트에서 `Secret`(stringData) 오브젝트로 분리. **GitOps 푸시에서는 Secret을 완전히 제외**하고 로컬 전용 파일(`{unit}-secrets.local.yaml`, git 미대상)에만 기록 — 클러스터 반영은 운영자가 별도 채널(kubectl apply, External Secrets Operator 등)로 수행 | `services/deployer.py`(`secret_env_keys`), `services/runtime/base.py`, `services/runtime/k8s_runtime.py` |
+| 2 | `LlmProviderKind.internal`이 라벨일 뿐 코드로 강제되지 않음 — admin이 실수로 `kind=internal` + 외부 URL을 등록해도 그대로 통과, "소스가 사외로 나가지 않는다"는 12절 주장이 코드로 보장되지 않음 | `LlmProviderCreate`에 `model_validator` 추가: `kind=internal`이면 `base_url`이 반드시 `project://`로 시작해야 등록 허용(그 외 422 거부) | `app/schemas.py` |
+| 3 | 채팅/리뷰 API가 `require_api_key`(비관리자 포함 전체 키)로만 보호되어, 일반 키 하나로 임의 프로젝트 + 임의(외부 포함) 프로바이더를 조합해 소스를 외부 LLM으로 보낼 수 있었음 | 세션 생성(`/chat/sessions`)·리뷰(`/projects/{id}/review`) 시점에 provider가 `external`이면 admin 키만 허용(403). `internal` 프로바이더는 계속 일반 키에 열어둠(사내망을 벗어나지 않으므로) | `app/api/llm.py`(`_require_admin_for_external`) |
+
+부수 하우스키핑: 실수로 커밋된 `platform/delete.txt`(pip freeze 덤프) 제거, 루트·`platform/.gitignore`에
+`.pytest_cache/` 추가.
+
+검증: pytest 107건 통과(신규 10건 — Secret 분리·GitOps 히스토리 무유출·internal 스킴 강제·
+admin 게이트 4종), 콘솔 `tsc`+`vite build`+vitest 통과.

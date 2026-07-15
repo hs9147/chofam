@@ -8,6 +8,8 @@ export interface ProjectOut {
   id: number;
   name: string;
   type: ProjectType;
+  organization_id: number | null;
+  // organization_id로 생성된 프로젝트는 비관리자에게 마스킹된 값이 온다
   git_url: string;
   branch: string;
   domain: string | null;
@@ -18,11 +20,20 @@ export interface ProjectOut {
 export interface ProjectCreate {
   name: string;
   type: ProjectType;
-  git_url: string;
+  // 둘 중 하나만 — organization_id 지정 시 리포를 내부에서 자동 생성(git_url 불가)
+  organization_id?: number | null;
+  git_url?: string;
   branch: string;
   domain?: string | null;
   health_check_path?: string;
   default_profile?: BuildProfile;
+}
+
+export interface OrgOut {
+  id: number;
+  name: string;
+  created_at: string;
+  project_count: number;
 }
 
 export interface DeploymentOut {
@@ -48,6 +59,8 @@ export interface ModuleOut {
   id: number;
   name: string;
   type: string;
+  category: string | null;
+  organization_id: number | null;
   config: Record<string, unknown>;
 }
 
@@ -55,6 +68,15 @@ export interface ModuleSummary {
   name: string;
   type: string;
   env: string[];
+}
+
+// 대화식 편집 화면 자원 리스팅 — 바인딩 여부와 무관하게 사용 가능한 모듈을 아이템화
+export interface ResourceItem {
+  id: number;
+  name: string;
+  type: string;
+  category: string | null;
+  scope: 'global' | 'org';
 }
 
 export interface LlmProviderOut {
@@ -97,6 +119,15 @@ export interface PreviewOut {
   expires_at: string;
 }
 
+export interface ProjectFilesOut {
+  files: string[];
+}
+
+export interface ProjectFileContentOut {
+  path: string;
+  content: string;
+}
+
 export interface AuditRow {
   actor: string;
   action: string;
@@ -129,6 +160,7 @@ export interface HealthInfo {
   tier: string;
   host_os: string;
   features: string[];
+  gitea_url: string | null;
 }
 
 export interface PaymentOut {

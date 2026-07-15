@@ -4,6 +4,7 @@ import Modal from '../components/Modal';
 import StatusPill from '../components/StatusPill';
 import { api } from '../lib/api';
 import { useApi } from '../lib/hooks';
+import type { OrgOut } from '../lib/types';
 
 const TYPE_HINTS: Record<string, string> = {
   external_api: '{"url": "https://...", "api_key": "..."}',
@@ -33,6 +34,8 @@ export default function Modules() {
               <tr>
                 <th>이름</th>
                 <th>타입</th>
+                <th>카테고리</th>
+                <th>범위</th>
                 <th>설정</th>
               </tr>
             </thead>
@@ -41,6 +44,10 @@ export default function Modules() {
                 <tr key={m.id}>
                   <td>{m.name}</td>
                   <td><StatusPill value={m.type} /></td>
+                  <td className="mutedtext">{m.category || '—'}</td>
+                  <td>
+                    <StatusPill value={m.organization_id ? 'org' : 'global'} />
+                  </td>
                   <td className="mono">{JSON.stringify(m.config)}</td>
                 </tr>
               ))}
@@ -68,8 +75,11 @@ function CreateModuleModal({
   onClose: () => void;
   onCreated: () => void;
 }) {
+  const orgs = useApi<OrgOut[]>(() => api.listOrgs());
   const [name, setName] = useState('');
   const [type, setType] = useState('external_api');
+  const [category, setCategory] = useState('');
+  const [organizationId, setOrganizationId] = useState('');
   const [config, setConfig] = useState(TYPE_HINTS.external_api);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -87,7 +97,11 @@ function CreateModuleModal({
       return;
     }
     try {
-      await api.createModule(name.trim(), type, parsed);
+      await api.createModule(
+        name.trim(), type, parsed,
+        category.trim() || undefined,
+        organizationId ? Number(organizationId) : undefined,
+      );
       onCreated();
     } catch (err) {
       setError((err as Error).message);
@@ -117,6 +131,23 @@ function CreateModuleModal({
             <option value="file_storage">file_storage — 파일 저장소</option>
           </select>
         </label>
+        <label className="field">
+          카테고리 (선택 — 예: news, llm, payment. 자원 목록에서 API를 묶어 보여줍니다)
+          <input value={category} onChange={(e) => setCategory(e.target.value)} />
+        </label>
+        {orgs.data && orgs.data.length > 0 && (
+          <label className="field">
+            조직 범위 (선택 — 지정 시 해당 조직 프로젝트에만 노출, 예: 조직별 DB)
+            <select value={organizationId} onChange={(e) => setOrganizationId(e.target.value)}>
+              <option value="">전역 (모든 프로젝트)</option>
+              {orgs.data.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <label className="field">
           설정 (JSON)
           <textarea

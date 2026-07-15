@@ -32,12 +32,30 @@ class DeploymentStatus(str, enum.Enum):
     stopped = "stopped"
 
 
+class Organization(Base):
+    """조직별 작업공간. 생성 시 사내 Gitea에 동명의 Organization을 함께 만든다
+    (services/gitea.py). 이름은 Gitea org명과 동일하게 유지한다."""
+
+    __tablename__ = "organizations"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    projects: Mapped[list["Project"]] = relationship(back_populates="organization")
+
+
 class Project(Base):
     __tablename__ = "projects"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(64), unique=True, index=True)
     type: Mapped[ProjectType] = mapped_column(Enum(ProjectType))
+    # 조직 소속 프로젝트는 git_url을 Gitea API로 내부 생성한다(사용자 직접 지정 불가) —
+    # api/projects.py 참고. organization_id가 없는 레거시 프로젝트만 git_url을 직접 받는다.
+    organization_id: Mapped[int | None] = mapped_column(
+        ForeignKey("organizations.id"), nullable=True
+    )
     git_url: Mapped[str] = mapped_column(String(512))
     branch: Mapped[str] = mapped_column(String(128), default="main")
     # 미지정 시 {name}.{base_domain} / development는 {name}-dev.{base_domain}
@@ -53,6 +71,7 @@ class Project(Base):
     llm_config: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
+    organization: Mapped["Organization | None"] = relationship(back_populates="projects")
     deployments: Mapped[list["Deployment"]] = relationship(back_populates="project")
     env_vars: Mapped[list["EnvVar"]] = relationship(back_populates="project")
 
@@ -175,6 +194,14 @@ class Module(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(64), unique=True)
     type: Mapped[ModuleType] = mapped_column(Enum(ModuleType))
+    # 자유 텍스트 분류(예: "news", "llm", "payment") — 대화식 편집 화면의 자원
+    # 리스팅에서 API를 카테고리별로 묶어 보여주는 용도. 미지정이면 "기타"로 묶인다.
+    category: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # 미지정(NULL) = 전역(모든 프로젝트에 노출), 지정 시 해당 조직 소속 프로젝트에만 노출
+    # ("조직별 db" 등 조직 전용 자원).
+    organization_id: Mapped[int | None] = mapped_column(
+        ForeignKey("organizations.id"), nullable=True
+    )
     # 민감 필드(api_key, dsn, password, secret)는 저장 시 Fernet 암호화됨
     config: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

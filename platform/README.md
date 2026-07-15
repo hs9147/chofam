@@ -93,8 +93,17 @@ GET  /status                          # CPU/메모리/디스크/GPU (admin)
 POST /keys                            # API 키 발급 (admin)
 GET  /audit                           # 감사 로그 (admin)
 
-GET  /projects
-POST /projects                        # {name, type, git_url, branch, domain?, ...}
+POST /orgs                            # {name} → 사내 Gitea에 동명 Organization 생성 (admin)
+GET  /orgs                            # 조직 목록 + 프로젝트 수
+
+GET  /projects                        # git_url은 organization_id 소속이면 비관리자에게 마스킹
+POST /projects                        # {name, type, branch, domain?, ...}
+                                      #   + organization_id(내부 리포 자동 생성) 또는 git_url(직접 지정) 중 하나
+POST /projects/upload                 # multipart: zip_file 또는 files[](폴더) 중 하나 + organization_id 필수
+                                      #   업로드 내용을 사내 Gitea 신규 리포에 최초 push (대용량/zip bomb/zip slip 방어)
+                                      #   deploy_after_upload=true면 push 직후 배포 큐에 등록(원클릭)
+GET  /projects/{id}/files             # 읽기 전용 파일 트리 (workspace 기능)
+GET  /projects/{id}/files/content?path=  # 읽기 전용 파일 내용 — 수정 엔드포인트는 없음(채팅/diff로만)
 POST /projects/{id}/deploy            # {profile?: development|release, git_sha?}
 POST /projects/{id}/rollback?profile=release
 POST /projects/{id}/stop?profile=development
@@ -142,9 +151,13 @@ POST /changes/{id}/reject
 POST /projects/{id}/review              # {provider_id, diff? , base_ref?} → 심각도 분류 findings
 
 POST /modules                           # external_api | internal_api | database | file_storage
+                                        #   + category?(예: news, llm — API 카테고리별 그룹핑)
+                                        #   + organization_id?(지정 시 해당 조직 프로젝트에만 노출)
                                         # config의 api_key/dsn/secret 등은 Fernet 암호화 저장
 POST /projects/{id}/modules/{mid}/bind  # {env_prefix: "PAY"} → 배포 시 PAY_URL 등 자동 주입
-GET  /projects/{id}/modules             # LLM 컨텍스트용 요약 (비밀값 제외)
+GET  /projects/{id}/modules             # LLM 컨텍스트용 요약 (비밀값 제외, 바인딩된 모듈만)
+GET  /projects/{id}/resources           # 대화식 편집 화면 자원 리스팅 — 바인딩 여부와 무관하게
+                                        #   이 프로젝트에서 쓸 수 있는 모든 모듈을 카테고리별로 아이템화
 
 POST /projects/{id}/preview             # {branch?, ttl_minutes=60} → {name}-pv{n}.{base_domain}
 GET  /projects/{id}/previews            # 조회 시 만료 프리뷰 자동 회수
@@ -170,9 +183,14 @@ npm run build        # tsc 타입체크 + vite build → dist/
 
 - 접속: `http://<서버>:7000/console/` → API 키로 로그인
   (admin 키: 대시보드·감사 로그·키 발급·프로바이더 등록 포함, 일반 키: 프로젝트 운영 화면)
-- 화면: 시스템 대시보드(CPU/메모리/디스크/GPU 게이지, 키 발급), 프로젝트(생성·dev/release
-  배포·롤백·중지·배포 이력·로그 3초 폴링·환경변수·모듈 바인딩·프리뷰), 모듈 레지스트리,
-  LLM 프로바이더, 대화식 코드 편집(diff 뷰 + 승인/거절 + 브랜치 리뷰), 감사 로그
+- 레이아웃: 메뉴는 왼쪽 고정 사이드바(`components/Layout.tsx`)에 배치되고, OS 태그·계정
+  구분·로그아웃은 사이드바 하단에 있다
+- 화면: 시스템 대시보드(CPU/메모리/디스크/GPU 게이지, 키 발급), 프로젝트(생성 시 git_url 직접
+  입력/조직 소속 자동 생성/zip·폴더 업로드 3가지 방식 선택, dev/release 배포·롤백·중지·배포
+  이력·로그 3초 폴링·환경변수·모듈 바인딩·프리뷰), 코드 확인(읽기 전용 파일 트리·내용 뷰어 —
+  수정은 채팅 탭에서 diff로만), 모듈 레지스트리(카테고리·조직 범위 표시), LLM 프로바이더,
+  대화식 코드 편집(diff 뷰 + 승인/거절 + 브랜치 리뷰 + 프로젝트 선택 시 카테고리별 사용 가능
+  자원 패널: API 카테고리·서버내 공유 파일·조직별 DB 아이템 리스팅), 감사 로그
 - 인증은 `x-api-key`를 sessionStorage에 보관(기존 admin/mail 관례). 로그인 검증은 admin 전용
   `GET /status` 응답 코드(200 admin / 403 일반 / 401 무효)를 프로브로 재사용
 - 의존성: react·react-dom·react-router-dom (전부 MIT). 라우팅은 해시 기반이라 새로고침·딥링크에
@@ -180,6 +198,37 @@ npm run build        # tsc 타입체크 + vite build → dist/
 
 ## 기업용 옵션 (14.2절 갭 구현)
 
+- **사내 Git 서버(Gitea)**: GitHub 대신 소스가 사외로 나가지 않는 self-host Git 서버 배포.
+  Docker Compose(1차)/K8s manifests(2차) + 웹훅·Keycloak SSO 연동은
+  [`infra/gitea/README.md`](infra/gitea/README.md) 참고. `PAAS_GITEA_URL`을 설정하면
+  콘솔 상단 메뉴에 **Git** 탭이 나타나 등록된 프로젝트별 리포 바로가기를 보여준다.
+- **코드 내부 관리 강제**: `PAAS_GIT_INTERNAL_ONLY=true` + `PAAS_GITEA_URL` 설정 시
+  프로젝트 등록 단계에서 `git_url` 호스트가 사내 Gitea와 다르면 422로 거부(github.com 등
+  외부 호스트 등록 원천 차단). internal LLM 프로바이더 강제(12절)와 동일한 원칙.
+- **조직별 작업공간**: 콘솔의 조직 페이지(admin)에서 조직을 만들면 사내 Gitea에 동일한
+  이름의 Organization이 함께 생성된다(`PAAS_GITEA_API_TOKEN` 필요). 조직 소속 프로젝트는
+  리포를 플랫폼이 내부에서 자동 생성·관리하며, git_url 등 메타 정보는 **일반 사용자
+  응답에서 마스킹**된다(admin만 실제 값 조회 가능) — `POST /orgs`, `GET /orgs`,
+  `POST /projects`의 `organization_id` 참고.
+- **zip/폴더 업로드 등록**: `POST /projects/upload`(조직 필수) — git 저장소가 아직 없는
+  코드를 zip 또는 폴더(다중 파일)로 올리면 플랫폼이 사내 Gitea에 신규 리포를 만들어
+  최초 커밋으로 push한다. 대용량·악성 업로드 방어(`app/services/upload.py`):
+  업로드 원본 스트리밍 크기 상한(`PAAS_UPLOAD_MAX_ZIP_MB`), 압축 해제 시 실제 바이트
+  기준 총량 상한(`PAAS_UPLOAD_MAX_UNCOMPRESSED_MB`, zip 헤더 선언값을 신뢰하지 않음),
+  엔트리 수 상한(`PAAS_UPLOAD_MAX_FILES`), 파일별 압축비 상한(`PAAS_UPLOAD_MAX_COMPRESSION_RATIO`),
+  절대경로·상위 디렉토리 탈출(zip slip)·심볼릭 링크 엔트리 거부. `deploy_after_upload`로
+  push 직후 배포까지 원클릭 진행 가능.
+- **코드 확인 화면**: `GET /projects/{id}/files`, `/files/content`로 리포를 읽기 전용
+  브라우징. 저장/수정 엔드포인트는 존재하지 않으며, 실제 코드 변경은 항상 LLM 채팅 →
+  diff 제안 → `POST /changes/{id}/apply` 승인 경로로만 이뤄진다(12절 원칙 유지).
+- **웹훅 자동 등록**: `PAAS_PLATFORM_PUBLIC_URL` 설정 시 조직 소속/업로드로 리포를 만들
+  때마다 플랫폼이 자신의 `/webhooks/git`을 Gitea 웹훅으로 자동 등록한다(베스트 에포트 —
+  실패해도 프로젝트 생성은 성공 처리). 비워두면 기존처럼 `infra/gitea/README.md`의
+  수동 웹훅 설정이 필요하다.
+- **Gitea private 리포 인증**: 조직/업로드로 생성된 리포는 Gitea에 `private:true`로
+  생성되므로, 플랫폼이 직접 clone/fetch/push할 때도 `PAAS_GITEA_API_TOKEN`을 git
+  프로세스에 `http.extraHeader`로 주입해 인증한다(`app/services/git_auth.py`) —
+  git_url 자체에는 토큰을 심지 않는다.
 - **OIDC/RBAC (Keycloak 호환)**: `PAAS_OIDC_ISSUER` 설정 시 `Authorization: Bearer <JWT>`
   인증 병행. `realm_access.roles`에 `PAAS_OIDC_ADMIN_ROLE`(기본 paas-admin)이 있으면 admin.
 - **비동기 배포**: `POST /projects/{id}/deploy`에 `"wait": false` → 202 즉시 반환,
@@ -197,6 +246,26 @@ npm run build        # tsc 타입체크 + vite build → dist/
 - **네임스페이스 Quota**: `PAAS_K8S_QUOTA_CPU`/`_MEMORY` 설정 시 ResourceQuota +
   기본 LimitRange 매니페스트 생성.
 
+## 플랫폼 내 Git 구현
+
+플랫폼은 **자체 리포(chofam)와는 무관하게**, 배포 대상 프로젝트마다 독립된 로컬 git 체크아웃을
+`work_dir`(기본 `./data/workspaces/{project}`) 아래 두고 조작한다. 전부 `subprocess`로 시스템 git을
+호출하며(플랫폼 자체 git 라이브러리 없음), 외부로 나가는 지점은 웹훅 수신과 GitOps 푸시 둘뿐이다.
+
+| 컴포넌트 | 파일 | 동작 |
+| --- | --- | --- |
+| **배포 체크아웃** | `services/build.py` `checkout()` | 최초엔 `git clone --branch`, 이후는 `fetch`+`reset --hard`로 매 배포마다 최신화. `git_sha` 지정 시 해당 커밋으로 `checkout`. **읽기 전용** — 이 리포에 커밋하지 않음 |
+| **웹훅 자동 배포** | `api/webhooks.py` | GitHub/Gitea push 이벤트를 **수신**(HMAC 서명 검증 필수)해 위 checkout→build 파이프라인을 트리거. 플랫폼이 밖으로 나가는 방향이 아니라 받는 방향 |
+| **코드 워크스페이스(채팅 편집)** | `services/workspace.py` | LLM이 제안한 diff를 `git apply` 후 작업 브랜치(`paas/chat-{id}`)에 **로컬 커밋만** 한다(`ensure_branch`, `apply_diff`). **자동 push 없음** — 승인(`/changes/{id}/apply`)해도 원격에 반영되지 않고, 실제 배포(release/development)를 실행해야 그 브랜치가 빌드된다 |
+| **GitOps 연계** | `services/runtime/k8s_runtime.py` `_gitops_push`/`_sync_gitops_repo` | 2차(K8s) 티어에서 `PAAS_K8S_GITOPS_REPO` 설정 시에만 활성화. 배포 **매니페스트**(이미지 태그·비-시크릿 env)를 별도 GitOps 리포에 커밋·푸시해 ArgoCD가 반영하게 한다. **시크릿은 여기 포함되지 않음**(15절) — 애초에 소스 코드가 아니라 K8s 매니페스트만 다루는 경로 |
+| **프리뷰** | `services/preview.py` | 위 checkout 재사용, 별도 git 조작 없음 |
+
+**핵심 경계선**: 프로젝트 소스 코드 자체가 플랫폼 밖의 git 리포로 나가는 경로는 없다
+(체크아웃은 읽기 전용, 채팅 편집은 로컬 커밋만). 외부로 실제 전송되는 것은 두 가지뿐이다 —
+① LLM 채팅 시 파일 **내용**이 API 호출로 프로바이더에 전송(어느 프로바이더인지는 12절/15절의
+internal·external 구분과 admin 게이트로 통제), ② GitOps 모드에서 배포 **매니페스트**(소스 아님)가
+운영자가 지정한 리포로 푸시.
+
 ## DB 마이그레이션 (PostgreSQL 운영)
 
 SQLite 빠른 시작은 기동 시 자동 생성(create_all)으로 충분하다.
@@ -211,7 +280,7 @@ PAAS_DATABASE_URL=postgresql://user:pw@host/paas python -m alembic upgrade head
 ## 테스트
 
 ```bash
-cd platform && python -m pytest tests/ -q   # 39 passed
+cd platform && python -m pytest tests/ -q   # 107 passed
 ```
 
 Docker/K8s 미설치 환경에서도 컨트롤 플레인·매니페스트 생성·프로필 로직이 검증됩니다.

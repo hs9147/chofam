@@ -93,9 +93,34 @@ class Settings(BaseSettings):
     # 웹훅 서명 검증용 공유 시크릿 (GitHub/Gitea 웹훅 설정에 동일 값 입력)
     webhook_secret: str = ""
 
+    # 사내 Git 서버(Gitea 등) 기본 URL — 콘솔에 "Git" 메뉴를 노출하는 용도로만 쓰인다
+    # (배포 동작에는 영향 없음, git_url은 프로젝트별로 여전히 개별 지정). infra/gitea/ 참고.
+    gitea_url: str = ""
+    # 조직/리포 자동 생성용 Gitea API 토큰 (Site Administration → Applications에서 발급,
+    # 조직 생성 권한 필요). 설정 없으면 /orgs API는 503으로 명확히 실패한다.
+    gitea_api_token: str = ""
+    # 기업용 거버넌스: true면 프로젝트 등록 시 git_url 호스트가 gitea_url과 일치해야
+    # 한다(github.com 등 외부 호스트 등록을 422로 거부). "소스가 사외로 나가지 않는다"는
+    # 보장을 internal LLM 강제(schemas.py)와 동일한 원칙으로 git 저장소에도 적용한다.
+    git_internal_only: bool = False
+
     # release 빌드 기본 리소스 (development는 build.py의 프로필 정의가 절반 수준으로 축소)
     default_memory_limit: str = "1g"
     default_cpu_limit: float = 1.0
+
+    # --- zip/폴더 업로드로 프로젝트 등록 (services/upload.py) ---
+    # 업로드 원본(zip 파일) 자체의 스트리밍 크기 상한
+    upload_max_zip_mb: int = 200
+    # 압축 해제 시 총 바이트 상한 (zip 헤더 선언값이 아닌 실제 해제 바이트로 강제) —
+    # 폴더 업로드(다중 파일)의 총 용량 상한으로도 동일하게 쓰인다.
+    upload_max_uncompressed_mb: int = 500
+    # zip 엔트리 수 / 폴더 업로드 파일 수 상한 (엔트리 폭탄 방지)
+    upload_max_files: int = 5000
+    # 파일별 (압축해제크기/압축크기) 상한 — 초과 시 zip bomb 의심으로 즉시 거부
+    upload_max_compression_ratio: int = 100
+    # 웹훅 자동 등록 시 플랫폼 자신을 가리키는 공개 URL (예: https://paas.example.com)
+    # 비우면 웹훅 자동 등록을 건너뛰고 infra/gitea/README.md의 수동 절차를 안내한다.
+    platform_public_url: str = ""
 
 
 @lru_cache
