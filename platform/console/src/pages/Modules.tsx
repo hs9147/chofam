@@ -113,8 +113,15 @@ function CreateModuleModal({
     <Modal title="새 모듈" onClose={onClose}>
       <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <label className="field">
-          이름 (소문자·숫자·하이픈)
-          <input value={name} onChange={(e) => setName(e.target.value)} required />
+          이름 — 빈칸 없이 소문자·숫자·하이픈만 사용하세요 (예: news-api)
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            pattern="[a-z0-9][a-z0-9-]{1,40}"
+            title="빈칸 없이 소문자·숫자·하이픈만 사용하세요 (예: news-api)"
+            placeholder="news-api"
+            required
+          />
         </label>
         <label className="field">
           타입

@@ -33,18 +33,24 @@ export default function Organizations() {
         소속 프로젝트는 리포를 플랫폼이 내부에서 자동으로 만들고 관리합니다 — 일반
         사용자에게는 Git 주소 등 메타 정보가 노출되지 않습니다.
       </p>
-      <form className="row" onSubmit={submit} style={{ marginBottom: 16 }}>
-        <input
-          placeholder="조직 이름 (예: shop-team)"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          pattern="[a-z0-9][a-z0-9-]{1,40}"
-          required
-          style={{ width: 240 }}
-        />
-        <button type="submit" disabled={busy}>
-          {busy ? '생성 중...' : '+ 조직 생성'}
-        </button>
+      <form onSubmit={submit} style={{ marginBottom: 16 }}>
+        <label className="field" style={{ display: 'inline-flex', marginRight: 10 }}>
+          조직 이름 — 빈칸 없이 소문자·숫자·하이픈만 사용하세요 (예: shop-team)
+          <div className="row">
+            <input
+              placeholder="shop-team"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              pattern="[a-z0-9][a-z0-9-]{1,40}"
+              title="빈칸 없이 소문자·숫자·하이픈만 사용하세요 (예: shop-team)"
+              required
+              style={{ width: 240 }}
+            />
+            <button type="submit" disabled={busy}>
+              {busy ? '생성 중...' : '+ 조직 생성'}
+            </button>
+          </div>
+        </label>
       </form>
       {error && <p className="error">{error}</p>}
       <Async state={state} empty="등록된 조직이 없습니다.">
