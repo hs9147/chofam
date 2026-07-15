@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -29,4 +30,15 @@ def _clean_db():
     from app.db import engine
 
     engine.dispose()
-    Path("./test-paas.db").unlink(missing_ok=True)
+    # 배포 큐(services/jobs.py)의 백그라운드 스레드가 방금 연 세션을 아직 닫는 중일 수 있다
+    # (테스트는 이미 통과했지만 스레드 종료는 비동기). Windows는 열린 파일 삭제를 POSIX보다
+    # 엄격히 막아 PermissionError(WinError 32)를 낸다 — 짧게 재시도해 흡수한다.
+    db_path = Path("./test-paas.db")
+    for attempt in range(20):
+        try:
+            db_path.unlink(missing_ok=True)
+            break
+        except PermissionError:
+            if attempt == 19:
+                raise
+            time.sleep(0.1)
