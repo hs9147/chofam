@@ -2,6 +2,7 @@ import { useState } from 'react';
 import Async from '../components/Async';
 import Modal from '../components/Modal';
 import StatusPill from '../components/StatusPill';
+import TopologyDiagram from '../components/TopologyDiagram';
 import { api, ApiError } from '../lib/api';
 import { useApi } from '../lib/hooks';
 import type { BuildProfile, RedirectRule } from '../lib/types';
@@ -11,6 +12,7 @@ export default function ServerConfig() {
   const [rulesFor, setRulesFor] = useState<{ id: number; name: string } | null>(null);
   const [busyKey, setBusyKey] = useState('');
   const [error, setError] = useState('');
+  const [showTopology, setShowTopology] = useState(true);
 
   const runAction = async (
     projectId: number, profile: BuildProfile, kind: 'deploy' | 'stop',
@@ -45,14 +47,20 @@ export default function ServerConfig() {
             <span className="status info" title="리버스프록시">
               proxy: {state.data.proxy_backend}
             </span>
+            <button className="small secondary" onClick={() => setShowTopology((v) => !v)}>
+              {showTopology ? '다이어그램 숨기기' : '다이어그램 보기'}
+            </button>
           </>
         )}
       </div>
       <p className="mutedtext" style={{ fontSize: 12 }}>
         프로젝트별 라우팅(도메인)·실행 상태·리다이렉트 규칙 수를 한눈에 봅니다. 리다이렉트/재작성
-        규칙은 프로젝트당 하나로 관리되며 다음 배포·롤백부터 반영됩니다.
+        규칙은 프로젝트당 하나로 관리되며 다음 배포·롤백부터 반영됩니다. 복합(백엔드+프론트엔드)
+        프로젝트는 도메인 하나 아래 <code>/api/*</code>(백엔드)·<code>/*</code>(프론트엔드)로
+        자동 라우팅됩니다 — 아래 다이어그램에서 컴포넌트별 상태를 볼 수 있습니다.
       </p>
       {error && <p className="error">{error}</p>}
+      {showTopology && state.data && <TopologyDiagram cfg={state.data} />}
       <Async state={state} empty="등록된 프로젝트가 없습니다.">
         {(cfg) => (
           <table>

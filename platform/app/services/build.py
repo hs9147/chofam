@@ -10,6 +10,7 @@
 프로젝트 리포에 Dockerfile이 있으면 그것을 우선하고(--build-arg APP_PROFILE 전달),
 없으면 templates/dockerfiles/{type}.{profile}.Dockerfile 템플릿을 사용한다.
 """
+import json
 import shutil
 import subprocess
 from dataclasses import dataclass, field
@@ -48,8 +49,9 @@ class ProfileSpec:
     resource_factor: float  # release 대비 리소스 배율
     replicas: int  # 2차(k8s)에서 사용. 1차는 항상 1.
 
-    def image_tag(self, project_name: str, git_sha: str) -> str:
-        return f"{project_name}:{git_sha[:12]}{self.tag_suffix}"
+    def image_tag(self, project_name: str, git_sha: str, component: str | None = None) -> str:
+        name = f"{project_name}-{component}" if component else project_name
+        return f"{name}:{git_sha[:12]}{self.tag_suffix}"
 
 
 PROFILES: dict[BuildProfile, ProfileSpec] = {
@@ -94,19 +96,32 @@ def internal_port(project_type: ProjectType, profile: BuildProfile) -> int:
     return INTERNAL_PORTS[(project_type, profile)]
 
 
-def build_image(project: Project, workdir: Path, git_sha: str, profile: BuildProfile) -> BuildResult:
+def build_image(
+    project: Project,
+    workdir: Path,
+    git_sha: str,
+    profile: BuildProfile,
+    *,
+    component: str | None = None,
+    component_type: ProjectType | None = None,
+) -> BuildResult:
+    """component가 주어지면(composite 전용) workdir/{component}를 별도 빌드 컨텍스트로
+    쓰고, 태그·로그 파일명에 컴포넌트명을 붙여 일반 프로젝트와 충돌하지 않게 한다."""
     settings = get_settings()
     spec = PROFILES[profile]
-    tag = spec.image_tag(project.name, git_sha)
-    dockerfile = dockerfile_for(project.type, profile, workdir)
+    build_type = component_type or project.type
+    context_dir = workdir / component if component else workdir
+    tag = spec.image_tag(project.name, git_sha, component=component)
+    dockerfile = dockerfile_for(build_type, profile, context_dir)
 
-    log_path = settings.build_log_dir / f"{project.name}-{git_sha[:12]}{spec.tag_suffix}.log"
+    log_name = f"{project.name}{f'-{component}' if component else ''}-{git_sha[:12]}{spec.tag_suffix}.log"
+    log_path = settings.build_log_dir / log_name
     cmd = [
         "docker", "build",
         "-f", str(dockerfile),
         "-t", tag,
         "--build-arg", f"APP_PROFILE={profile.value}",
-        str(workdir),
+        str(context_dir),
     ]
     with open(log_path, "w", encoding="utf-8") as log:
         log.write(f"$ {' '.join(cmd)}\n")
@@ -117,10 +132,42 @@ def build_image(project: Project, workdir: Path, git_sha: str, profile: BuildPro
 
     return BuildResult(
         image_tag=tag,
-        internal_port=internal_port(project.type, profile),
+        internal_port=internal_port(build_type, profile),
         log_path=log_path,
         profile=profile,
         extra_env=dict(spec.env),
+    )
+
+
+COMPOSITE_COMPONENTS: tuple[str, str] = ("backend", "frontend")
+
+
+def detect_composite_components(workdir: Path) -> dict[str, ProjectType] | None:
+    """backend/, frontend/ 서브폴더가 둘 다 있어야 composite로 인정한다(하나만 있으면
+    일반 단일 프로젝트로 취급 — None 반환). 각 서브폴더의 실제 타입은 시그니처 파일로
+    추론하고, 추론 불가면 ValueError로 명확히 실패한다(추측성 기본값 금지)."""
+    dirs = {name: workdir / name for name in COMPOSITE_COMPONENTS}
+    if not all(d.is_dir() for d in dirs.values()):
+        return None
+    return {name: _detect_component_type(d) for name, d in dirs.items()}
+
+
+def _detect_component_type(component_dir: Path) -> ProjectType:
+    if (component_dir / "requirements.txt").exists() or (component_dir / "pyproject.toml").exists():
+        return ProjectType.python
+    package_json = component_dir / "package.json"
+    if package_json.exists():
+        try:
+            manifest = json.loads(package_json.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            manifest = {}
+        deps = {**manifest.get("dependencies", {}), **manifest.get("devDependencies", {})}
+        return ProjectType.react if "react" in deps else ProjectType.node
+    if (component_dir / "index.html").exists():
+        return ProjectType.html
+    raise ValueError(
+        f"컴포넌트 타입을 추론할 수 없습니다: {component_dir} "
+        "(requirements.txt/pyproject.toml, package.json, index.html 중 하나가 필요합니다)"
     )
 
 

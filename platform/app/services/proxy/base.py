@@ -32,6 +32,17 @@ def site_name(project_name: str, profile: BuildProfile) -> str:
     return f"{project_name}{suffix}"
 
 
+@dataclass
+class PathRoute:
+    """한 도메인 안에서 경로 접두사로 서로 다른 업스트림에 나눠 라우팅하는 규칙
+    (composite 프로젝트의 backend/frontend 분리 전용). 매칭된 접두사는 백엔드로
+    전달되기 전에 제거된다(예: "/api/" 라우트는 "/api/users" → 업스트림 "/users") —
+    세 프록시 백엔드가 동일한 규칙을 따른다."""
+
+    path_prefix: str  # 예: "/api/", "/"
+    endpoint: Endpoint
+
+
 class ReverseProxy(ABC):
     @abstractmethod
     def configure(
@@ -39,6 +50,13 @@ class ReverseProxy(ABC):
         endpoint: Endpoint, redirects: list[RedirectSpec],
     ) -> None:
         """도메인 → endpoint 라우팅 + redirect/rewrite 규칙을 반영하고 무중단 reload한다."""
+
+    @abstractmethod
+    def configure_paths(
+        self, project_name: str, profile: BuildProfile, domain: str,
+        routes: list[PathRoute], redirects: list[RedirectSpec],
+    ) -> None:
+        """한 도메인을 경로 접두사별로 여러 업스트림에 나눠 라우팅한다(composite 전용)."""
 
     @abstractmethod
     def remove(self, project_name: str, profile: BuildProfile) -> None:

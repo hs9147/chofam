@@ -12,11 +12,14 @@ from ...config import get_settings
 from ...models import BuildProfile, RedirectRule
 from ..runtime.base import Endpoint
 from .apache_proxy import ApacheProxy
-from .base import RedirectSpec, ReverseProxy
+from .base import PathRoute, RedirectSpec, ReverseProxy
 from .caddy_proxy import CaddyProxy
 from .iis_proxy import IISProxy
 
-__all__ = ["RedirectSpec", "ReverseProxy", "get_proxy", "domain_for", "configure", "remove"]
+__all__ = [
+    "RedirectSpec", "ReverseProxy", "PathRoute", "get_proxy", "domain_for",
+    "configure", "configure_paths", "remove",
+]
 
 
 def get_proxy() -> ReverseProxy:
@@ -46,6 +49,17 @@ def configure(
         for r in (redirects or [])
     ]
     get_proxy().configure(project_name, profile, domain, endpoint, specs)
+
+
+def configure_paths(
+    project_name: str, profile: BuildProfile, domain: str, routes: list[PathRoute],
+    redirects: list[RedirectRule] | list[RedirectSpec] | None = None,
+) -> None:
+    specs = [
+        r if isinstance(r, RedirectSpec) else RedirectSpec.from_rule(r)
+        for r in (redirects or [])
+    ]
+    get_proxy().configure_paths(project_name, profile, domain, routes, specs)
 
 
 def remove(project_name: str, profile: BuildProfile) -> None:

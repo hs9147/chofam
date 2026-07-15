@@ -9,7 +9,7 @@ import subprocess
 from ...config import get_settings
 from ...models import BuildProfile
 from ..runtime.base import Endpoint
-from .base import RedirectSpec, ReverseProxy, site_name
+from .base import PathRoute, RedirectSpec, ReverseProxy, site_name
 
 REDIRECT_TYPES = {301: "Permanent", 302: "Found", 303: "SeeOther", 307: "Temporary"}
 
@@ -57,6 +57,44 @@ def _web_config(endpoint: Endpoint, redirects: list[RedirectSpec]) -> str:
     )
 
 
+def _path_rule_xml(idx: int, route: PathRoute) -> str:
+    prefix = route.path_prefix.strip("/")
+    proxy_target = f"http://{route.endpoint.host}:{route.endpoint.port}/{{R:1}}"
+    return (
+        f'        <rule name="path-{idx}" stopProcessing="true">\n'
+        f'          <match url="^{prefix}/(.*)" />\n'
+        f'          <action type="Rewrite" url="{proxy_target}" />\n'
+        f'        </rule>\n'
+    )
+
+
+def _web_config_paths(routes: list[PathRoute], redirects: list[RedirectSpec]) -> str:
+    """비루트(prefix) 규칙을 먼저 매칭시키고, "/"는 캐치올로 마지막에 둔다 —
+    매칭된 접두사는 업스트림에 전달되기 전에 제거된다(handle_path/ProxyPass와 동일 규약)."""
+    rule_blocks = "".join(_rule_xml(i, r) for i, r in enumerate(redirects))
+    non_root = [r for r in routes if r.path_prefix not in ("/", "")]
+    root = next((r for r in routes if r.path_prefix in ("/", "")), routes[-1])
+    path_blocks = "".join(_path_rule_xml(i, r) for i, r in enumerate(non_root))
+    proxy_target = f"http://{root.endpoint.host}:{root.endpoint.port}/{{R:1}}"
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        "<configuration>\n"
+        "  <system.webServer>\n"
+        "    <rewrite>\n"
+        "      <rules>\n"
+        f"{rule_blocks}"
+        f"{path_blocks}"
+        '        <rule name="reverse-proxy" stopProcessing="true">\n'
+        '          <match url="(.*)" />\n'
+        f'          <action type="Rewrite" url="{proxy_target}" />\n'
+        "        </rule>\n"
+        "      </rules>\n"
+        "    </rewrite>\n"
+        "  </system.webServer>\n"
+        "</configuration>\n"
+    )
+
+
 class IISProxy(ReverseProxy):
     def configure(self, project_name, profile: BuildProfile, domain, endpoint: Endpoint,
                   redirects: list[RedirectSpec]) -> None:
@@ -68,6 +106,23 @@ class IISProxy(ReverseProxy):
 
         # 이미 있으면 삭제 후 재생성 — 존재 여부를 appcmd 출력에서 파싱하는 것보다 단순하고
         # 멱등하다(사이트가 없어 delete가 실패해도 조용히 넘어간다).
+        subprocess.run(
+            [settings.iis_appcmd_path, "delete", "site", f"/site.name:{name}"],
+            capture_output=True, text=True,
+        )
+        self._appcmd(
+            "add", "site",
+            f"/name:{name}", f"/physicalPath:{site_dir}", f"/bindings:http/*:80:{domain}",
+        )
+
+    def configure_paths(self, project_name, profile: BuildProfile, domain,
+                         routes: list[PathRoute], redirects: list[RedirectSpec]) -> None:
+        settings = get_settings()
+        name = site_name(project_name, profile)
+        site_dir = settings.iis_sites_root / name
+        site_dir.mkdir(parents=True, exist_ok=True)
+        (site_dir / "web.config").write_text(_web_config_paths(routes, redirects), encoding="utf-8")
+
         subprocess.run(
             [settings.iis_appcmd_path, "delete", "site", f"/site.name:{name}"],
             capture_output=True, text=True,

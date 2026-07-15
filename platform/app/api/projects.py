@@ -20,6 +20,7 @@ from ..schemas import (
 )
 from ..security import encrypt_value, require_api_key
 from ..services import deployer, gitea, upload
+from ..services.build import COMPOSITE_COMPONENTS
 from ..services.deployer import DeployInProgress, NoRollbackTarget
 from ..services.gitea import GiteaError, GiteaNotConfigured
 from ..services.upload import UploadError, UploadRejected
@@ -184,12 +185,15 @@ async def upload_project(
     audit.record(db, key.name, "project.upload", project.name, {"git_sha": git_sha})
 
     if form.deploy_after_upload and is_enabled("deploy"):
-        deployer.deploy_queued(db, project, form.default_profile, git_sha)
+        if project.type == ProjectType.composite:
+            deployer.deploy_composite_queued(db, project, form.default_profile, git_sha)
+        else:
+            deployer.deploy_queued(db, project, form.default_profile, git_sha)
 
     return _serialize_project(project, key)
 
 
-@router.post("/{project_id}/deploy", response_model=DeploymentOut,
+@router.post("/{project_id}/deploy", response_model=DeploymentOut | list[DeploymentOut],
              dependencies=[Depends(require_feature("deploy"))])
 async def deploy_project(
     project_id: int,
@@ -200,6 +204,24 @@ async def deploy_project(
 ):
     project = _get_project(db, project_id)
     profile = body.profile or project.default_profile
+    if project.type == ProjectType.composite:
+        if not body.wait:
+            records = deployer.deploy_composite_queued(db, project, profile, body.git_sha)
+            response.status_code = 202
+            audit.record(db, key.name, "deploy.queued", project.name,
+                         {"profile": profile.value, "deployment_ids": [r.id for r in records.values()]})
+            return list(records.values())
+        try:
+            records = await deployer.deploy_composite(db, project, profile, body.git_sha)
+        except DeployInProgress as e:
+            raise HTTPException(status_code=409, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=502, detail=str(e)[:1000])
+        audit.record(
+            db, key.name, "deploy", project.name,
+            {"profile": profile.value, "deployment_ids": [r.id for r in records.values()]},
+        )
+        return list(records.values())
     if not body.wait:
         record = deployer.deploy_queued(db, project, profile, body.git_sha)
         response.status_code = 202
@@ -219,7 +241,7 @@ async def deploy_project(
     return record
 
 
-@router.post("/{project_id}/rollback", response_model=DeploymentOut,
+@router.post("/{project_id}/rollback", response_model=DeploymentOut | list[DeploymentOut],
              dependencies=[Depends(require_feature("deploy"))])
 def rollback_project(
     project_id: int,
@@ -228,6 +250,18 @@ def rollback_project(
     key: ApiKey = Depends(require_api_key),
 ):
     project = _get_project(db, project_id)
+    if project.type == ProjectType.composite:
+        try:
+            records = deployer.rollback_composite(db, project, profile)
+        except NoRollbackTarget as e:
+            raise HTTPException(status_code=404, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=502, detail=str(e)[:1000])
+        audit.record(db, key.name, "rollback", project.name, {
+            "profile": profile.value,
+            "to_shas": {name: r.git_sha for name, r in records.items()},
+        })
+        return list(records.values())
     try:
         record = deployer.rollback(db, project, profile)
     except NoRollbackTarget as e:
@@ -248,7 +282,12 @@ def stop_project(
     key: ApiKey = Depends(require_api_key),
 ):
     project = _get_project(db, project_id)
-    deployer.get_runtime().stop(project.name, profile)
+    runtime = deployer.get_runtime()
+    if project.type == ProjectType.composite:
+        for name in COMPOSITE_COMPONENTS:
+            runtime.stop(f"{project.name}-{name}", profile)
+    else:
+        runtime.stop(project.name, profile)
     audit.record(db, key.name, "stop", project.name, {"profile": profile.value})
 
 
@@ -281,7 +320,13 @@ def project_logs(
     _: ApiKey = Depends(require_api_key),
 ):
     project = _get_project(db, project_id)
-    return {"logs": deployer.get_runtime().logs(project.name, profile, tail)}
+    runtime = deployer.get_runtime()
+    if project.type == ProjectType.composite:
+        return {
+            name: runtime.logs(f"{project.name}-{name}", profile, tail)
+            for name in COMPOSITE_COMPONENTS
+        }
+    return {"logs": runtime.logs(project.name, profile, tail)}
 
 
 @router.get("/{project_id}/status", dependencies=[Depends(require_feature("deploy"))])
@@ -292,6 +337,14 @@ def project_status(
 ):
     project = _get_project(db, project_id)
     runtime = deployer.get_runtime()
+    if project.type == ProjectType.composite:
+        return {
+            profile.value: {
+                name: runtime.status(f"{project.name}-{name}", profile)
+                for name in COMPOSITE_COMPONENTS
+            }
+            for profile in BuildProfile
+        }
     return {
         profile.value: runtime.status(project.name, profile)
         for profile in BuildProfile

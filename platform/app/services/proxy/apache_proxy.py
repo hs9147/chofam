@@ -10,7 +10,7 @@ import subprocess
 from ...config import get_settings
 from ...models import BuildProfile
 from ..runtime.base import Endpoint
-from .base import RedirectSpec, ReverseProxy, site_name
+from .base import PathRoute, RedirectSpec, ReverseProxy, site_name
 
 
 def _directive(r: RedirectSpec) -> str:
@@ -39,11 +39,48 @@ def _conf_file(project_name: str, profile: BuildProfile):
     return settings.apache_sites_dir / f"{site_name(project_name, profile)}.conf"
 
 
+def _path_directives(routes: list[PathRoute]) -> str:
+    """ProxyPass는 등록 순서대로 매칭하므로 비루트(prefix) 규칙을 먼저 둔다 — mod_proxy가
+    접두사를 자동으로 벗겨내므로 handle_path/IIS rewrite와 동일한 규약이 된다."""
+    lines = []
+    for r in routes:
+        if r.path_prefix in ("/", ""):
+            continue
+        prefix = "/" + r.path_prefix.strip("/") + "/"
+        lines.append(f"    ProxyPass {prefix} http://{r.endpoint.host}:{r.endpoint.port}/\n")
+        lines.append(f"    ProxyPassReverse {prefix} http://{r.endpoint.host}:{r.endpoint.port}/\n")
+    return "".join(lines)
+
+
+def _vhost_conf_paths(domain: str, routes: list[PathRoute], redirects: list[RedirectSpec]) -> str:
+    root = next((r for r in routes if r.path_prefix in ("/", "")), routes[-1])
+    rewrite_engine = "    RewriteEngine On\n" if any(r.kind == "rewrite" for r in redirects) else ""
+    directives = "".join(_directive(r) for r in redirects)
+    return (
+        "<VirtualHost *:80>\n"
+        f"    ServerName {domain}\n"
+        f"{rewrite_engine}"
+        f"{directives}"
+        "    ProxyPreserveHost On\n"
+        f"{_path_directives(routes)}"
+        f"    ProxyPass / http://{root.endpoint.host}:{root.endpoint.port}/\n"
+        f"    ProxyPassReverse / http://{root.endpoint.host}:{root.endpoint.port}/\n"
+        "</VirtualHost>\n"
+    )
+
+
 class ApacheProxy(ReverseProxy):
     def configure(self, project_name, profile: BuildProfile, domain, endpoint: Endpoint,
                   redirects: list[RedirectSpec]) -> None:
         _conf_file(project_name, profile).write_text(
             _vhost_conf(domain, endpoint, redirects), encoding="utf-8",
+        )
+        self._reload()
+
+    def configure_paths(self, project_name, profile: BuildProfile, domain,
+                         routes: list[PathRoute], redirects: list[RedirectSpec]) -> None:
+        _conf_file(project_name, profile).write_text(
+            _vhost_conf_paths(domain, routes, redirects), encoding="utf-8",
         )
         self._reload()
 

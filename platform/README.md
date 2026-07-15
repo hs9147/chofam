@@ -259,11 +259,22 @@ npm run build        # tsc 타입체크 + vite build → dist/
   환경변수로 리슨 포트 전달) 관례로 기동하며, IIS는 `web.config`(URL Rewrite)+appcmd,
   Apache는 VirtualHost(mod_proxy/mod_rewrite)+`apachectl graceful`로 사이트를
   등록·반영한다. `GET /server-config`가 현재 선택된 백엔드와 프로젝트별(프로필별)
-  도메인·실행 상태·리다이렉트 규칙 수를 한 화면에서 보여준다(콘솔 "서버구성" 메뉴).
+  도메인·실행 상태·리다이렉트 규칙 수를 한 화면에서 보여주고, 콘솔 "서버구성" 메뉴는
+  이를 표와 함께 proxy → 사이트 → runtime 관계를 그리는 토폴로지 다이어그램(순수 SVG,
+  신규 의존성 없음)으로도 시각화한다.
 - **프로젝트별 URL redirect/rewrite 규칙**: `POST/GET /projects/{id}/redirects`,
   `DELETE /redirects/{id}`로 등록하면 다음 배포·롤백 때 선택된 프록시 백엔드 설정에
   자동 반영된다(Caddy `redir`/`rewrite`, IIS URL Rewrite rule, Apache
   `Redirect`/`RewriteRule`).
+- **복합(백엔드+프론트엔드) 프로젝트**: `type: composite`로 등록하면 리포 루트의
+  `backend/`, `frontend/` 서브폴더를 배포 시점에 자동 감지(시그니처 파일 기준 —
+  requirements.txt/pyproject.toml→python, package.json+react 의존성→react,
+  package.json만→node, index.html만→html)해 각각 별도 이미지로 빌드·기동하고, 같은
+  도메인 아래 `/api/*`는 백엔드로, `/*`는 프론트엔드로 자동 라우팅한다(Caddy
+  `handle_path`/IIS URL Rewrite 조건부 규칙/Apache `ProxyPass` 접두사 — 세 프록시
+  백엔드 모두 지원). 배포는 원자적이다: 한쪽이 실패하면 실패한 컴포넌트만 재빌드 없이
+  직전 정상 이미지로 복구한 뒤에만 프록시를 갱신하므로, 부분 실패가 서비스 중단으로
+  이어지지 않는다(`app/services/deployer.py`의 `deploy_composite_sync` 참고).
 - **OIDC/RBAC (Keycloak 호환)**: `PAAS_OIDC_ISSUER` 설정 시 `Authorization: Bearer <JWT>`
   인증 병행. `realm_access.roles`에 `PAAS_OIDC_ADMIN_ROLE`(기본 paas-admin)이 있으면 admin.
 - **비동기 배포**: `POST /projects/{id}/deploy`에 `"wait": false` → 202 즉시 반환,

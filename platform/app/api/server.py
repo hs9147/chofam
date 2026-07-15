@@ -12,10 +12,16 @@ from sqlalchemy.orm import Session
 from .. import audit
 from ..config import get_settings
 from ..db import get_db
-from ..models import ApiKey, BuildProfile, Project, RedirectKind, RedirectRule
-from ..schemas import RedirectRuleCreate, RedirectRuleOut, ServerConfigOut, ServerConfigSite
+from ..models import (
+    ApiKey, BuildProfile, Deployment, DeploymentStatus, Project, ProjectType,
+    RedirectKind, RedirectRule,
+)
+from ..schemas import (
+    ComponentStatus, RedirectRuleCreate, RedirectRuleOut, ServerConfigOut, ServerConfigSite,
+)
 from ..security import require_api_key
 from ..services import deployer
+from ..services.build import COMPOSITE_COMPONENTS
 from ..services.proxy import domain_for
 
 router = APIRouter(tags=["server"])
@@ -32,13 +38,44 @@ def server_config(db: Session = Depends(get_db), _: ApiKey = Depends(require_api
             .group_by(RedirectRule.project_id)
         ).all()
     )
+    # composite 컴포넌트의 내부 포트 — 롤백 없이도 마지막으로 running이었던 값을 보여준다
+    ports = {
+        (project_id, profile, component): port
+        for project_id, profile, component, port in db.execute(
+            select(
+                Deployment.project_id, Deployment.profile, Deployment.component,
+                Deployment.internal_port,
+            ).where(
+                Deployment.status == DeploymentStatus.running,
+                Deployment.component.is_not(None),
+            )
+        ).all()
+    }
     sites = []
     for p in projects:
         for profile in BuildProfile:
-            try:
-                status = runtime.status(p.name, profile)
-            except Exception as e:  # noqa: BLE001 — 런타임 미설치/미접근이 전체 화면을 막지 않게
-                status = f"unknown ({e})"
+            components = None
+            if p.type == ProjectType.composite:
+                # composite는 {name}-backend/{name}-frontend로 따로 등록되므로(런타임
+                # 유닛 이름 규칙은 RuntimeSpec.unit_name과 동일), 컴포넌트별로 조회하고
+                # 전체 상태는 둘의 상태를 종합해 요약한다 — {name} 단독 유닛은 없다.
+                components = []
+                for name in COMPOSITE_COMPONENTS:
+                    try:
+                        comp_status = runtime.status(f"{p.name}-{name}", profile)
+                    except Exception as e:  # noqa: BLE001
+                        comp_status = f"unknown ({e})"
+                    components.append(ComponentStatus(
+                        name=name, status=comp_status,
+                        internal_port=ports.get((p.id, profile, name)),
+                    ))
+                statuses = {c.status for c in components}
+                status = statuses.pop() if len(statuses) == 1 else "partial"
+            else:
+                try:
+                    status = runtime.status(p.name, profile)
+                except Exception as e:  # noqa: BLE001 — 런타임 미설치/미접근이 전체 화면을 막지 않게
+                    status = f"unknown ({e})"
             sites.append(ServerConfigSite(
                 project_id=p.id,
                 project_name=p.name,
@@ -46,6 +83,7 @@ def server_config(db: Session = Depends(get_db), _: ApiKey = Depends(require_api
                 domain=domain_for(p.name, p.domain, profile),
                 status=status,
                 redirect_count=counts.get(p.id, 0),
+                components=components,
             ))
     return ServerConfigOut(
         runtime_backend=settings.runtime_backend if settings.tier == "small" else "kubernetes",

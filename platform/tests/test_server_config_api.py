@@ -66,6 +66,44 @@ def test_server_config_tolerates_runtime_errors(monkeypatch, fresh_settings):
     assert all(s["status"].startswith("unknown") for s in r.json()["sites"])
 
 
+def test_server_config_composite_project_shows_components(monkeypatch, fresh_settings):
+    monkeypatch.setattr(deployer, "get_runtime", lambda: _FakeRuntime())
+    c = _client()
+    pid = c.post("/projects", json={
+        "name": "shop-app", "type": "composite", "git_url": "https://git.example.com/x",
+    }, headers=ADMIN).json()["id"]
+
+    body = c.get("/server-config", headers=ADMIN).json()
+    release = next(s for s in body["sites"] if s["project_id"] == pid and s["profile"] == "release")
+    assert release["status"] == "running"  # backend/frontend 둘 다 running이면 요약도 running
+    assert {c["name"] for c in release["components"]} == {"backend", "frontend"}
+    assert all(c["status"] == "running" for c in release["components"])
+
+    # 일반 프로젝트는 components가 없다(None)
+    other_pid = _create_project(c, "shop-plain")
+    body = c.get("/server-config", headers=ADMIN).json()
+    plain = next(s for s in body["sites"] if s["project_id"] == other_pid)
+    assert plain.get("components") is None
+
+
+def test_server_config_composite_partial_status_summarized_as_partial(monkeypatch, fresh_settings):
+    class _MixedRuntime:
+        def status(self, name, *a):
+            return "failed" if name.endswith("-frontend") else "running"
+
+    monkeypatch.setattr(deployer, "get_runtime", lambda: _MixedRuntime())
+    c = _client()
+    pid = c.post("/projects", json={
+        "name": "shop-mixed", "type": "composite", "git_url": "https://git.example.com/x",
+    }, headers=ADMIN).json()["id"]
+
+    body = c.get("/server-config", headers=ADMIN).json()
+    release = next(s for s in body["sites"] if s["project_id"] == pid and s["profile"] == "release")
+    assert release["status"] == "partial"
+    statuses = {c["name"]: c["status"] for c in release["components"]}
+    assert statuses == {"backend": "running", "frontend": "failed"}
+
+
 def test_redirect_crud_flow(fresh_settings):
     c = _client()
     pid = _create_project(c)

@@ -431,6 +431,45 @@ roleRef:
 Deployment/Service를 직접 작성해 관리할 것(사내 Gitea 인프라와 동일한 패턴,
 `platform/infra/gitea/k8s/` 참고).
 
+### 3.10 복합(백엔드+프론트엔드) 프로젝트 배포
+
+한 리포에 백엔드 API와 프론트엔드가 함께 있는 모노레포는 `type: composite`로 등록하면
+플랫폼이 두 컴포넌트를 자동 감지해 따로 빌드·배포하고 한 도메인으로 묶어준다.
+
+**리포 구조 요구사항**: 루트에 `backend/`, `frontend/` 서브폴더가 반드시 둘 다 있어야
+한다(하나만 있으면 일반 프로젝트로 취급돼 잘못된 결과가 난다). 각 서브폴더의 타입은
+시그니처 파일로 자동 추론한다 — `requirements.txt`/`pyproject.toml` → python,
+`package.json`에 `react` 의존성 → react, `package.json`만 있으면 → node, `index.html`만
+있으면 → html. 둘 중 아무것도 없으면 배포가 명확한 에러로 실패한다(추측 배포 금지).
+서브폴더 안에 자체 `Dockerfile`이 있으면 그걸 우선 쓴다(루트 Dockerfile 우선 규칙과 동일).
+
+```bash
+BASE=http://127.0.0.1:7000  ADMIN=paas_...
+
+# 조직 소속으로 등록(레거시 git_url 직접 지정 경로도 가능 — 3.3절과 동일)
+curl -X POST $BASE/projects -H "x-api-key: $ADMIN" -H 'content-type: application/json' \
+  -d '{"name":"shop-app","type":"composite","organization_id":1}'
+
+curl -X POST $BASE/projects/1/deploy -H "x-api-key: $ADMIN" \
+  -H 'content-type: application/json' -d '{"profile":"release"}'
+```
+
+배포되면 `https://shop-app.deploy.example.com/api/*`는 backend로, 나머지 전체
+(`/*`)는 frontend로 자동 라우팅된다(Caddy `handle_path` / IIS URL Rewrite 조건부 규칙 /
+Apache `ProxyPass` 접두사 — 3.1절에서 고른 프록시 백엔드와 무관하게 동일하게 동작).
+매칭된 접두사(`/api`)는 백엔드로 전달되기 전에 제거된다 — 백엔드는 `/api/users`가 아니라
+`/users`로 라우트를 짜면 된다.
+
+**원자적 배포**: backend/frontend 둘 중 하나만 빌드·기동에 실패하면, 실패한 컴포넌트만
+재빌드 없이 직전 정상 이미지로 복구한 뒤에야 프록시를 갱신한다 — 성공한 쪽만 새 버전이
+되고 실패한 쪽은 이전 버전 그대로 남아, 부분 실패가 다운타임으로 이어지지 않는다. 되돌릴
+이전 버전이 아예 없는 첫 배포에서 실패하면(예: 신규 프로젝트) 전체가 실패로 기록되고
+프록시는 아예 건드리지 않는다. `GET /server-config`·콘솔 "서버구성" 토폴로지
+다이어그램에서 컴포넌트별 상태를 개별 확인할 수 있다.
+
+`POST /projects/1/rollback`도 컴포넌트 단위가 아니라 backend/frontend가 **한 쌍으로
+갖춰진** 직전 배포로 함께 되돌아간다(재빌드 없음).
+
 ---
 
 ## 4. 종합 예시 — 하이브리드 구성 한 장

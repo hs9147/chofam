@@ -192,6 +192,25 @@ pre.logbox {
 .diffview .hunk { color: var(--accent); background: rgba(74, 108, 247, 0.08); }
 .diffview .meta { color: var(--muted); }
 
+/* 서버구성 토폴로지 다이어그램 */
+.topo-wrap { overflow-x: auto; margin-top: 10px; }
+.topo-edge { fill: none; stroke: var(--border); stroke-width: 1.5; }
+.topo-node { fill: var(--bg); stroke: var(--border); stroke-width: 1.5; }
+.topo-node.ok { stroke: var(--green); }
+.topo-node.warn { stroke: var(--yellow); }
+.topo-node.bad { stroke: var(--red); }
+.topo-node.dim { stroke: var(--muted); }
+.topo-node.info { stroke: var(--accent); fill: rgba(74, 108, 247, 0.12); }
+.topo-node-outer { fill: var(--panel); stroke: var(--border-soft); }
+.topo-label-title { fill: var(--text); font-size: 12px; font-weight: 600; font-family: inherit; }
+.topo-sublabel {
+  fill: var(--muted);
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.topo-legend { margin-top: 10px; gap: 14px; }
+.topo-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+
 /* 게이지 바 */
 .gauge { background: rgba(255, 255, 255, 0.08); border-radius: 6px; height: 10px; overflow: hidden; }
 .gauge > div { height: 100%; background: var(--accent); border-radius: 6px; }
