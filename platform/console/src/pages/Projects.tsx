@@ -6,7 +6,7 @@ import StatusPill from '../components/StatusPill';
 import { api } from '../lib/api';
 import { fmtDate } from '../lib/format';
 import { useApi } from '../lib/hooks';
-import type { BuildProfile, ProjectType } from '../lib/types';
+import type { BuildProfile, ProjectCreate, ProjectType } from '../lib/types';
 
 export default function Projects() {
   const state = useApi(() => api.listProjects());
@@ -62,9 +62,11 @@ export default function Projects() {
 }
 
 function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+  const orgs = useApi(() => api.listOrgs());
   const [form, setForm] = useState({
     name: '',
     type: 'react' as ProjectType,
+    organization_id: '', // 빈 문자열 = 직접 Git URL 입력(레거시 경로)
     git_url: '',
     branch: 'main',
     domain: '',
@@ -75,13 +77,27 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
   const [busy, setBusy] = useState(false);
 
   const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
+  const usingOrg = form.organization_id !== '';
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true);
     setError('');
+    const payload: ProjectCreate = {
+      name: form.name,
+      type: form.type,
+      branch: form.branch,
+      domain: form.domain || null,
+      health_check_path: form.health_check_path,
+      default_profile: form.default_profile,
+    };
+    if (usingOrg) {
+      payload.organization_id = Number(form.organization_id);
+    } else {
+      payload.git_url = form.git_url;
+    }
     try {
-      await api.createProject({ ...form, domain: form.domain || null });
+      await api.createProject(payload);
       onCreated();
     } catch (err) {
       setError((err as Error).message);
@@ -105,10 +121,30 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
             <option value="llm">llm</option>
           </select>
         </label>
-        <label className="field">
-          Git URL
-          <input value={form.git_url} onChange={(e) => set('git_url', e.target.value)} required />
-        </label>
+
+        {orgs.data && orgs.data.length > 0 && (
+          <label className="field">
+            조직 (선택 시 사내 Gitea 리포를 내부에서 자동 생성 — Git 주소는 노출되지 않음)
+            <select
+              value={form.organization_id}
+              onChange={(e) => set('organization_id', e.target.value)}
+            >
+              <option value="">직접 Git URL 입력</option>
+              {orgs.data.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        {!usingOrg && (
+          <label className="field">
+            Git URL
+            <input value={form.git_url} onChange={(e) => set('git_url', e.target.value)} required />
+          </label>
+        )}
+
         <div className="row">
           <label className="field" style={{ flex: 1 }}>
             브랜치

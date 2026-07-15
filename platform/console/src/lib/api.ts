@@ -12,6 +12,7 @@ import type {
   LlmProviderOut,
   ModuleOut,
   ModuleSummary,
+  OrgOut,
   PreviewOut,
   ProjectCreate,
   ProjectOut,
@@ -84,6 +85,10 @@ export const api = {
   // 프로젝트
   listProjects: () => request<ProjectOut[]>('GET', '/projects'),
   createProject: (body: ProjectCreate) => request<ProjectOut>('POST', '/projects', body),
+
+  // 조직 (사내 Gitea 작업공간)
+  listOrgs: () => request<OrgOut[]>('GET', '/orgs'),
+  createOrg: (name: string) => request<OrgOut>('POST', '/orgs', { name }),
   deploy: (id: number, profile?: BuildProfile, git_sha?: string) =>
     request<DeploymentOut>('POST', `/projects/${id}/deploy`, {
       profile: profile ?? null,

@@ -32,12 +32,30 @@ class DeploymentStatus(str, enum.Enum):
     stopped = "stopped"
 
 
+class Organization(Base):
+    """조직별 작업공간. 생성 시 사내 Gitea에 동명의 Organization을 함께 만든다
+    (services/gitea.py). 이름은 Gitea org명과 동일하게 유지한다."""
+
+    __tablename__ = "organizations"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    projects: Mapped[list["Project"]] = relationship(back_populates="organization")
+
+
 class Project(Base):
     __tablename__ = "projects"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(64), unique=True, index=True)
     type: Mapped[ProjectType] = mapped_column(Enum(ProjectType))
+    # 조직 소속 프로젝트는 git_url을 Gitea API로 내부 생성한다(사용자 직접 지정 불가) —
+    # api/projects.py 참고. organization_id가 없는 레거시 프로젝트만 git_url을 직접 받는다.
+    organization_id: Mapped[int | None] = mapped_column(
+        ForeignKey("organizations.id"), nullable=True
+    )
     git_url: Mapped[str] = mapped_column(String(512))
     branch: Mapped[str] = mapped_column(String(128), default="main")
     # 미지정 시 {name}.{base_domain} / development는 {name}-dev.{base_domain}
@@ -53,6 +71,7 @@ class Project(Base):
     llm_config: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
+    organization: Mapped["Organization | None"] = relationship(back_populates="projects")
     deployments: Mapped[list["Deployment"]] = relationship(back_populates="project")
     env_vars: Mapped[list["EnvVar"]] = relationship(back_populates="project")
 

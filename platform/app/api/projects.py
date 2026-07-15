@@ -6,7 +6,7 @@ from .. import audit
 from ..db import get_db
 from ..features import require_feature
 from ..git_policy import enforce_internal_git_url
-from ..models import ApiKey, BuildProfile, Deployment, EnvVar, Project
+from ..models import ApiKey, BuildProfile, Deployment, EnvVar, Organization, Project
 from ..schemas import (
     DeploymentOut,
     DeployRequest,
@@ -15,10 +15,21 @@ from ..schemas import (
     ProjectOut,
 )
 from ..security import encrypt_value, require_api_key
-from ..services import deployer
+from ..services import deployer, gitea
 from ..services.deployer import DeployInProgress, NoRollbackTarget
+from ..services.gitea import GiteaError, GiteaNotConfigured
 
 router = APIRouter(prefix="/projects", tags=["projects"])
+
+GIT_URL_MASK = "(내부 관리 — 관리자만 조회 가능)"
+
+
+def _serialize_project(project: Project, key: ApiKey) -> ProjectOut:
+    """비관리자에게는 git_url(리포 위치) 등 메타 정보를 노출하지 않는다."""
+    out = ProjectOut.model_validate(project)
+    if not key.is_admin:
+        out.git_url = GIT_URL_MASK
+    return out
 
 
 def _get_project(db: Session, project_id: int) -> Project:
@@ -29,8 +40,9 @@ def _get_project(db: Session, project_id: int) -> Project:
 
 
 @router.get("", response_model=list[ProjectOut])
-def list_projects(db: Session = Depends(get_db), _: ApiKey = Depends(require_api_key)):
-    return db.execute(select(Project).order_by(Project.id)).scalars().all()
+def list_projects(db: Session = Depends(get_db), key: ApiKey = Depends(require_api_key)):
+    rows = db.execute(select(Project).order_by(Project.id)).scalars()
+    return [_serialize_project(p, key) for p in rows]
 
 
 @router.post("", response_model=ProjectOut, status_code=201)
@@ -42,12 +54,28 @@ def create_project(
     exists = db.execute(select(Project).where(Project.name == body.name)).scalar_one_or_none()
     if exists:
         raise HTTPException(status_code=409, detail="project name already exists")
-    enforce_internal_git_url(body.git_url)
-    project = Project(**body.model_dump())
+
+    git_url = body.git_url
+    if body.organization_id is not None:
+        org = db.get(Organization, body.organization_id)
+        if org is None:
+            raise HTTPException(status_code=404, detail="organization not found")
+        try:
+            # 프로젝트별 레포 생성·코드 관리는 플랫폼이 내부에서 처리 — 사용자는
+            # git_url을 직접 지정하거나 조회하지 않는다.
+            git_url = gitea.ensure_repo(org.name, body.name)
+        except GiteaNotConfigured as e:
+            raise HTTPException(status_code=503, detail=str(e))
+        except GiteaError as e:
+            raise HTTPException(status_code=502, detail=str(e))
+
+    enforce_internal_git_url(git_url)
+    data = body.model_dump(exclude={"git_url"})
+    project = Project(**data, git_url=git_url)
     db.add(project)
     db.commit()
     audit.record(db, key.name, "project.create", project.name)
-    return project
+    return _serialize_project(project, key)
 
 
 @router.post("/{project_id}/deploy", response_model=DeploymentOut,

@@ -8,6 +8,8 @@ export interface ProjectOut {
   id: number;
   name: string;
   type: ProjectType;
+  organization_id: number | null;
+  // organization_id로 생성된 프로젝트는 비관리자에게 마스킹된 값이 온다
   git_url: string;
   branch: string;
   domain: string | null;
@@ -18,11 +20,20 @@ export interface ProjectOut {
 export interface ProjectCreate {
   name: string;
   type: ProjectType;
-  git_url: string;
+  // 둘 중 하나만 — organization_id 지정 시 리포를 내부에서 자동 생성(git_url 불가)
+  organization_id?: number | null;
+  git_url?: string;
   branch: string;
   domain?: string | null;
   health_check_path?: string;
   default_profile?: BuildProfile;
+}
+
+export interface OrgOut {
+  id: number;
+  name: string;
+  created_at: string;
+  project_count: number;
 }
 
 export interface DeploymentOut {

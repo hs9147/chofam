@@ -56,8 +56,13 @@ DB를 Postgres로 교체하려면 deployment.yaml 주석의 `GITEA__database__*`
 
 ## 플랫폼과 연결
 
-1. **프로젝트 등록**: `POST /projects`의 `git_url`을 이 Gitea 인스턴스 주소로 지정
-   (예: `https://git.example.com/org/shop-api`)
+0. **(조직별 자동 관리 — 권장)** Site Administration → Applications에서 조직/리포 생성
+   권한이 있는 API 토큰을 발급해 플랫폼 `.env`의 `PAAS_GITEA_API_TOKEN`에 설정하면,
+   콘솔의 "조직" 페이지(admin)에서 조직을 만들 때마다 여기 동명의 Organization이
+   자동 생성되고, 조직 소속 프로젝트의 리포도 플랫폼이 대신 만든다 — 사용자는
+   Gitea 화면에서 직접 리포를 만들 필요가 없다(일반 사용자에게 git_url도 노출 안 됨).
+1. **(레거시) 프로젝트 등록**: 조직을 쓰지 않는 경우 `POST /projects`의 `git_url`을
+   이 Gitea 인스턴스 주소로 직접 지정 (예: `https://git.example.com/org/shop-api`)
 2. **웹훅 자동 배포**: Gitea 리포 → Settings → Webhooks → Add Webhook
    - Payload URL: `https://<플랫폼>/webhooks/git`
    - Secret: 플랫폼 `.env`의 `PAAS_WEBHOOK_SECRET`과 동일 값

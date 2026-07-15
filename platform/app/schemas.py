@@ -5,10 +5,24 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from .models import BuildProfile, DeploymentStatus, ProjectType
 
 
+class OrgCreate(BaseModel):
+    name: str = Field(pattern=r"^[a-z0-9][a-z0-9-]{1,40}$")
+
+
+class OrgOut(BaseModel):
+    id: int
+    name: str
+    created_at: datetime
+    project_count: int
+
+
 class ProjectCreate(BaseModel):
     name: str = Field(pattern=r"^[a-z0-9][a-z0-9-]{1,40}$")
     type: ProjectType
-    git_url: str
+    # 지정 시 리포를 조직 소속 Gitea 레포로 플랫폼이 내부 생성한다 — git_url을
+    # 함께 줄 수 없다(아래 검증). 미지정 시 기존처럼 git_url을 직접 받는 레거시 경로.
+    organization_id: int | None = None
+    git_url: str | None = None
     branch: str = "main"
     domain: str | None = None
     health_check_path: str = "/"
@@ -17,6 +31,17 @@ class ProjectCreate(BaseModel):
     default_profile: BuildProfile = BuildProfile.release
     llm_config: dict | None = None
 
+    @model_validator(mode="after")
+    def _git_source_exactly_one(self) -> "ProjectCreate":
+        if self.organization_id is None and not self.git_url:
+            raise ValueError("organization_id 또는 git_url 중 하나는 필수입니다")
+        if self.organization_id is not None and self.git_url:
+            raise ValueError(
+                "organization_id 지정 시 git_url을 직접 지정할 수 없습니다 "
+                "(내부 Gitea 리포로 자동 생성됩니다)"
+            )
+        return self
+
 
 class ProjectOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -24,6 +49,8 @@ class ProjectOut(BaseModel):
     id: int
     name: str
     type: ProjectType
+    organization_id: int | None
+    # 비관리자 응답에서는 마스킹된다 (api/projects.py `_serialize_project`)
     git_url: str
     branch: str
     domain: str | None

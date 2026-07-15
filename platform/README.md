@@ -93,8 +93,12 @@ GET  /status                          # CPU/메모리/디스크/GPU (admin)
 POST /keys                            # API 키 발급 (admin)
 GET  /audit                           # 감사 로그 (admin)
 
-GET  /projects
-POST /projects                        # {name, type, git_url, branch, domain?, ...}
+POST /orgs                            # {name} → 사내 Gitea에 동명 Organization 생성 (admin)
+GET  /orgs                            # 조직 목록 + 프로젝트 수
+
+GET  /projects                        # git_url은 organization_id 소속이면 비관리자에게 마스킹
+POST /projects                        # {name, type, branch, domain?, ...}
+                                      #   + organization_id(내부 리포 자동 생성) 또는 git_url(직접 지정) 중 하나
 POST /projects/{id}/deploy            # {profile?: development|release, git_sha?}
 POST /projects/{id}/rollback?profile=release
 POST /projects/{id}/stop?profile=development
@@ -187,6 +191,11 @@ npm run build        # tsc 타입체크 + vite build → dist/
 - **코드 내부 관리 강제**: `PAAS_GIT_INTERNAL_ONLY=true` + `PAAS_GITEA_URL` 설정 시
   프로젝트 등록 단계에서 `git_url` 호스트가 사내 Gitea와 다르면 422로 거부(github.com 등
   외부 호스트 등록 원천 차단). internal LLM 프로바이더 강제(12절)와 동일한 원칙.
+- **조직별 작업공간**: 콘솔의 조직 페이지(admin)에서 조직을 만들면 사내 Gitea에 동일한
+  이름의 Organization이 함께 생성된다(`PAAS_GITEA_API_TOKEN` 필요). 조직 소속 프로젝트는
+  리포를 플랫폼이 내부에서 자동 생성·관리하며, git_url 등 메타 정보는 **일반 사용자
+  응답에서 마스킹**된다(admin만 실제 값 조회 가능) — `POST /orgs`, `GET /orgs`,
+  `POST /projects`의 `organization_id` 참고.
 - **OIDC/RBAC (Keycloak 호환)**: `PAAS_OIDC_ISSUER` 설정 시 `Authorization: Bearer <JWT>`
   인증 병행. `realm_access.roles`에 `PAAS_OIDC_ADMIN_ROLE`(기본 paas-admin)이 있으면 admin.
 - **비동기 배포**: `POST /projects/{id}/deploy`에 `"wait": false` → 202 즉시 반환,

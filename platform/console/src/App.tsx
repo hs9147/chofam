@@ -8,6 +8,7 @@ import Dashboard from './pages/Dashboard';
 import Git from './pages/Git';
 import Login from './pages/Login';
 import Modules from './pages/Modules';
+import Organizations from './pages/Organizations';
 import Payments from './pages/Payments';
 import ProjectDetail from './pages/ProjectDetail';
 import Projects from './pages/Projects';
@@ -60,6 +61,14 @@ export default function App() {
           <Route path="previews" element={<PreviewsTab />} />
         </Route>
         <Route path="/modules" element={<Modules />} />
+        <Route
+          path="/orgs"
+          element={
+            <AdminOnly>
+              <Organizations />
+            </AdminOnly>
+          }
+        />
         <Route
           path="/payments"
           element={
