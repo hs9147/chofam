@@ -288,6 +288,149 @@ curl -X POST $BASE/projects/1/modules/1/bind -H "x-api-key: $ADMIN" \
 플랫폼 코드는 GitHub·Gitea 웹훅 서명을 둘 다 자동 인식하므로(3.4절과 동일 절차),
 `git_url`만 사내 Gitea 주소로 바꾸면 이후 흐름은 동일하다.
 
+### 3.9 Kubernetes(2차/기업용)로 전환
+
+`PAAS_TIER=small`(Docker)에서 `PAAS_TIER=enterprise`로 바꾸면 `Runtime` 인터페이스가
+`DockerRuntime`에서 `K8sRuntime`으로 교체된다(6.3절 규칙 2) — **플랫폼 자체는 그대로 두고**,
+플랫폼이 대신 배포 대상 K8s 클러스터에 매니페스트를 적용하는 방식이다. 플랫폼 프로세스를
+클러스터 안에서 돌릴 필요는 없다(선택 사항 — 아래 5단계 참고).
+
+#### 0) 사전 준비 (플랫폼이 설치해주지 않는 것들)
+
+- **K8s 클러스터**: k3s부터 가능(단일 노드로 시작해도 됨), 관리형(EKS/GKE/AKS)도 무방
+- **Ingress 컨트롤러**: 기본값은 Traefik(`PAAS_K8S_INGRESS_CLASS=traefik`), ingress-nginx로 바꾸려면
+  이 값도 함께 바꿀 것
+- **cert-manager + ClusterIssuer**: 기본값은 `letsencrypt`(`PAAS_K8S_CLUSTER_ISSUER`) — 자동 TLS 발급용
+- **이미지 레지스트리(중요)**: 플랫폼의 빌드 단계(`services/build.py`)는 배포 서버에서
+  `docker build`까지만 하고 **레지스트리로 push하지 않는다**. `PAAS_K8S_REGISTRY`를 설정하면
+  매니페스트의 이미지 이름 앞에 그 레지스트리 주소를 붙일 뿐이므로, 클러스터 노드가 실제로
+  그 이미지를 pull할 수 있으려면 별도 push 파이프라인(CI에서 build&push, 또는 Harbor 등)을
+  직접 연결해야 한다. 단일 노드 k3s로 시작한다면 플랫폼이 빌드하는 호스트를 그 노드와
+  동일하게 두고 `PAAS_K8S_REGISTRY`를 비워 로컬 이미지명을 그대로 쓰는 방법이 가장 간단하다.
+
+#### 1) kubernetes 파이썬 패키지 + 클러스터 접근
+
+```bash
+# 실행 위치: 플랫폼이 도는 서버 (venv 활성 상태)
+pip install kubernetes
+```
+
+클러스터 접근은 표준 kubeconfig 탐색 순서를 그대로 따른다(`services/runtime/k8s_runtime.py`):
+1. in-cluster 설정(플랫폼을 파드로 돌릴 때 — 서비스어카운트 토큰 자동 사용)
+2. 위가 안 되면 `~/.kube/config`(또는 `KUBECONFIG` 환경변수)
+
+플랫폼을 클러스터 밖(기존 1차 서버 등)에서 그대로 돌린다면 그 서버에 kubeconfig 파일만
+놓으면 된다 — 가장 간단한 시작 방법.
+
+#### 2) 네임스페이스 준비 (direct-apply 모드는 자동 생성되지 않음)
+
+```bash
+kubectl create namespace paas-apps   # PAAS_K8S_NAMESPACE 기본값과 동일하게
+```
+
+주의: `namespace_manifests()`(Namespace + 선택적 ResourceQuota/LimitRange)는 **GitOps 모드**
+(`PAAS_K8S_GITOPS_REPO` 설정 시)에서만 `_namespace.yaml`로 자동 커밋된다. 클러스터에 직접
+apply하는 기본 경로는 네임스페이스가 이미 있다고 가정하므로, 최초 배포 전에 위처럼 수동으로
+만들어둬야 한다(안 만들면 첫 배포에서 apply 실패 → 매니페스트 파일 폴백으로 떨어진다).
+
+#### 3) `.env` 설정
+
+```bash
+PAAS_TIER=enterprise
+PAAS_K8S_NAMESPACE=paas-apps
+PAAS_K8S_REGISTRY=                 # 비우면 로컬 이미지명 그대로 사용 (위 0단계 참고)
+PAAS_K8S_INGRESS_CLASS=traefik
+PAAS_K8S_CLUSTER_ISSUER=letsencrypt
+# 선택 — 멀티테넌시 격리(유닛별 NetworkPolicy, 갭6)
+PAAS_K8S_ISOLATION=false
+PAAS_K8S_INGRESS_NAMESPACE=traefik
+# 선택 — 네임스페이스 ResourceQuota/LimitRange (GitOps 모드에서만 자동 적용됨, 위 참고)
+PAAS_K8S_QUOTA_CPU=
+PAAS_K8S_QUOTA_MEMORY=
+# 선택 — GitOps(ArgoCD) 연계: 설정하면 클러스터에 직접 apply하지 않고 이 리포에 매니페스트 커밋·푸시
+PAAS_K8S_GITOPS_REPO=
+PAAS_K8S_GITOPS_BRANCH=main
+PAAS_K8S_GITOPS_PATH=apps
+```
+
+재기동 후 확인:
+
+```bash
+curl -s $BASE/health -H "x-api-key: $ADMIN"   # "tier":"enterprise" 확인
+```
+
+#### 4) 첫 배포로 검증
+
+```bash
+curl -X POST $BASE/projects -H "x-api-key: $ADMIN" -H 'content-type: application/json' \
+  -d '{"name":"shop-api","type":"python","git_url":"https://github.com/org/shop-api"}'
+curl -X POST $BASE/projects/1/deploy -H "x-api-key: $ADMIN" \
+  -H 'content-type: application/json' -d '{"profile":"release"}'
+
+# 확인
+kubectl -n paas-apps get deploy,svc,ingress
+curl -s $BASE/projects/1/status -H "x-api-key: $ADMIN"
+```
+
+클러스터 접근이 안 되거나 `kubernetes` 패키지가 없으면 조용히 실패하지 않고
+`PAAS_K8S_MANIFEST_DIR`(기본 `./data/k8s-manifests`)에 매니페스트 YAML을 대신 써서
+`kubectl apply -f`로 수동 적용하거나 GitOps로 연계할 수 있게 한다. 반대로 **클러스터에
+연결된 상태에서 apply 자체가 실패**하면(RBAC 부족, 리소스 충돌 등) 조용히 넘어가지 않고
+3회 재시도 후 `K8sApplyError`로 표면화된다(갭4) — 배포가 "성공"으로 오인되지 않도록.
+
+#### 5) (선택) 플랫폼을 클러스터 안에서 파드로 돌릴 때 — RBAC
+
+플랫폼을 클러스터 밖 서버에서 kubeconfig로 접근하는 대신 클러스터 안 파드로 돌리고
+싶다면, 아래처럼 네임스페이스 범위의 최소 권한 ServiceAccount를 만든다
+(`k8s_runtime.py`가 실제로 건드리는 리소스만 포함):
+
+```yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: paas-controller
+  namespace: paas-apps
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: paas-controller
+  namespace: paas-apps
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments", "deployments/scale"]
+    verbs: ["get", "list", "create", "update", "patch"]
+  - apiGroups: [""]
+    resources: ["services", "secrets"]
+    verbs: ["get", "list", "create", "update", "patch"]
+  - apiGroups: [""]
+    resources: ["pods", "pods/log"]
+    verbs: ["get", "list"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses", "networkpolicies"]
+    verbs: ["get", "list", "create", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: paas-controller
+  namespace: paas-apps
+subjects:
+  - kind: ServiceAccount
+    name: paas-controller
+    namespace: paas-apps
+roleRef:
+  kind: Role
+  name: paas-controller
+  apiGroup: rbac.authorization.k8s.io
+```
+
+이 ServiceAccount를 플랫폼 파드의 `spec.serviceAccountName`에 지정하면
+`config.load_incluster_config()`가 자동으로 이 권한을 사용한다. 이 리포에는 플랫폼
+자체의 K8s 배포 매니페스트가 포함돼 있지 않다 — 위 RBAC 예시와 함께 운영 리포에
+Deployment/Service를 직접 작성해 관리할 것(사내 Gitea 인프라와 동일한 패턴,
+`platform/infra/gitea/k8s/` 참고).
+
 ---
 
 ## 4. 종합 예시 — 하이브리드 구성 한 장
