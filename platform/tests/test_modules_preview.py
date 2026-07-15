@@ -21,9 +21,12 @@ def test_external_api_env():
 
 
 def test_database_env_encrypted_dsn():
-    m = _module(ModuleType.database, {"dsn": "postgresql://u:pw@db/prod"})
-    assert svc.binding_env(m, "MAIN")["MAIN_DSN"] == "postgresql://u:pw@db/prod"
-    assert "pw" not in str(m.config)
+    dsn = "postgresql://u:pw@db/prod"
+    m = _module(ModuleType.database, {"dsn": dsn})
+    assert svc.binding_env(m, "MAIN")["MAIN_DSN"] == dsn
+    # 저장 형태는 암호문 — 평문 DSN 전체가 그대로 남아있지 않아야 한다.
+    # (2글자 부분 문자열 검사는 base64 암호문에 우연히 등장할 수 있어 플레이키했음)
+    assert dsn not in str(m.config)
 
 
 def test_internal_api_env_resolves_by_tier():
