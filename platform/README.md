@@ -124,13 +124,13 @@ ADMIN=... BASE=http://localhost:7000
 
 # 프로젝트 등록
 curl -X POST $BASE/projects -H "x-api-key: $ADMIN" -H 'content-type: application/json' \
-  -d '{"name":"shop-front","type":"react","git_url":"https://git.example.com/org/shop-front"}'
+  -d '{"name":"front","type":"react","git_url":"https://git.example.com/org/shop-front"}'
 
-# development 배포 → shop-front-dev.{base_domain}
+# development 배포 → front-dev.{base_domain}
 curl -X POST $BASE/projects/1/deploy -H "x-api-key: $ADMIN" \
   -H 'content-type: application/json' -d '{"profile":"development"}'
 
-# release 배포 → shop-front.{base_domain}
+# release 배포 → front.{base_domain}
 curl -X POST $BASE/projects/1/deploy -H "x-api-key: $ADMIN" \
   -H 'content-type: application/json' -d '{"profile":"release"}'
 
