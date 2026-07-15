@@ -113,6 +113,13 @@ GET  /projects/{id}/status
 PUT  /projects/{id}/env               # {key, value, is_secret} — Fernet 암호화 저장
 GET  /projects/{id}/env               # 시크릿 값은 마스킹
 
+GET  /server-config                   # 서버구성 시각화 — 런타임/프록시 백엔드 + 프로젝트별
+                                      #   (프로필별) 도메인·상태·리다이렉트 규칙 수
+POST /projects/{id}/redirects         # {from_path, to_path, kind: redirect|rewrite, status_code?}
+                                      #   다음 배포·롤백부터 리버스프록시 설정에 반영
+GET  /projects/{id}/redirects
+DELETE /redirects/{id}
+
 POST /webhooks/git                    # GitHub/Gitea push → default_profile로 자동 배포
                                       # HMAC 서명(X-Hub-Signature-256 / X-Gitea-Signature) 필수
 ```
@@ -190,7 +197,9 @@ npm run build        # tsc 타입체크 + vite build → dist/
   이력·로그 3초 폴링·환경변수·모듈 바인딩·프리뷰), 코드 확인(읽기 전용 파일 트리·내용 뷰어 —
   수정은 채팅 탭에서 diff로만), 모듈 레지스트리(카테고리·조직 범위 표시), LLM 프로바이더,
   대화식 코드 편집(diff 뷰 + 승인/거절 + 브랜치 리뷰 + 프로젝트 선택 시 카테고리별 사용 가능
-  자원 패널: API 카테고리·서버내 공유 파일·조직별 DB 아이템 리스팅), 감사 로그
+  자원 패널: API 카테고리·서버내 공유 파일·조직별 DB 아이템 리스팅), 서버구성(런타임/
+  프록시 백엔드 표시, 프로젝트×프로필별 도메인·상태·배포/중지, 리다이렉트/재작성 규칙
+  관리), 감사 로그
 - 인증은 `x-api-key`를 sessionStorage에 보관(기존 admin/mail 관례). 로그인 검증은 admin 전용
   `GET /status` 응답 코드(200 admin / 403 일반 / 401 무효)를 프로브로 재사용
 - 의존성: react·react-dom·react-router-dom (전부 MIT). 라우팅은 해시 기반이라 새로고침·딥링크에
@@ -229,6 +238,19 @@ npm run build        # tsc 타입체크 + vite build → dist/
   생성되므로, 플랫폼이 직접 clone/fetch/push할 때도 `PAAS_GITEA_API_TOKEN`을 git
   프로세스에 `http.extraHeader`로 주입해 인증한다(`app/services/git_auth.py`) —
   git_url 자체에는 토큰을 심지 않는다.
+- **운영환경별 런타임/리버스프록시 선택 + 서버구성 시각화**: 1차(small)는 실행 런타임을
+  `PAAS_RUNTIME_BACKEND`(docker 기본 | windows_service — Docker 없이 nssm으로 네이티브
+  프로세스를 Windows Service로 등록), 리버스프록시를 `PAAS_PROXY_BACKEND`(caddy 기본 |
+  iis | apache)로 각각 독립적으로 선택할 수 있다(`app/services/runtime/`,
+  `app/services/proxy/`). windows_service는 리포 루트의 `paas-start.cmd`(PORT
+  환경변수로 리슨 포트 전달) 관례로 기동하며, IIS는 `web.config`(URL Rewrite)+appcmd,
+  Apache는 VirtualHost(mod_proxy/mod_rewrite)+`apachectl graceful`로 사이트를
+  등록·반영한다. `GET /server-config`가 현재 선택된 백엔드와 프로젝트별(프로필별)
+  도메인·실행 상태·리다이렉트 규칙 수를 한 화면에서 보여준다(콘솔 "서버구성" 메뉴).
+- **프로젝트별 URL redirect/rewrite 규칙**: `POST/GET /projects/{id}/redirects`,
+  `DELETE /redirects/{id}`로 등록하면 다음 배포·롤백 때 선택된 프록시 백엔드 설정에
+  자동 반영된다(Caddy `redir`/`rewrite`, IIS URL Rewrite rule, Apache
+  `Redirect`/`RewriteRule`).
 - **OIDC/RBAC (Keycloak 호환)**: `PAAS_OIDC_ISSUER` 설정 시 `Authorization: Bearer <JWT>`
   인증 병행. `realm_access.roles`에 `PAAS_OIDC_ADMIN_ROLE`(기본 paas-admin)이 있으면 admin.
 - **비동기 배포**: `POST /projects/{id}/deploy`에 `"wait": false` → 202 즉시 반환,

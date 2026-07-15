@@ -1,0 +1,263 @@
+import { useState } from 'react';
+import Async from '../components/Async';
+import Modal from '../components/Modal';
+import StatusPill from '../components/StatusPill';
+import { api, ApiError } from '../lib/api';
+import { useApi } from '../lib/hooks';
+import type { BuildProfile, RedirectRule } from '../lib/types';
+
+export default function ServerConfig() {
+  const state = useApi(() => api.serverConfig());
+  const [rulesFor, setRulesFor] = useState<{ id: number; name: string } | null>(null);
+  const [busyKey, setBusyKey] = useState('');
+  const [error, setError] = useState('');
+
+  const runAction = async (
+    projectId: number, profile: BuildProfile, kind: 'deploy' | 'stop',
+  ) => {
+    const key = `${projectId}-${profile}-${kind}`;
+    setBusyKey(key);
+    setError('');
+    try {
+      if (kind === 'deploy') {
+        await api.deploy(projectId, profile);
+      } else {
+        await api.stop(projectId, profile);
+      }
+      state.reload();
+    } catch (e) {
+      setError((e as ApiError).message);
+    } finally {
+      setBusyKey('');
+    }
+  };
+
+  return (
+    <div className="panel">
+      <div className="row" style={{ marginBottom: 10 }}>
+        <h2 style={{ margin: 0 }}>서버구성</h2>
+        <div className="spacer" />
+        {state.data && (
+          <>
+            <span className="status info" title="실행 런타임">
+              runtime: {state.data.runtime_backend}
+            </span>
+            <span className="status info" title="리버스프록시">
+              proxy: {state.data.proxy_backend}
+            </span>
+          </>
+        )}
+      </div>
+      <p className="mutedtext" style={{ fontSize: 12 }}>
+        프로젝트별 라우팅(도메인)·실행 상태·리다이렉트 규칙 수를 한눈에 봅니다. 리다이렉트/재작성
+        규칙은 프로젝트당 하나로 관리되며 다음 배포·롤백부터 반영됩니다.
+      </p>
+      {error && <p className="error">{error}</p>}
+      <Async state={state} empty="등록된 프로젝트가 없습니다.">
+        {(cfg) => (
+          <table>
+            <thead>
+              <tr>
+                <th>프로젝트</th>
+                <th>프로필</th>
+                <th>도메인</th>
+                <th>상태</th>
+                <th>리다이렉트</th>
+                <th style={{ width: 280 }}>동작</th>
+              </tr>
+            </thead>
+            <tbody>
+              {cfg.sites.map((s) => {
+                const deployKey = `${s.project_id}-${s.profile}-deploy`;
+                const stopKey = `${s.project_id}-${s.profile}-stop`;
+                return (
+                  <tr key={`${s.project_id}-${s.profile}`}>
+                    <td>{s.project_name}</td>
+                    <td><StatusPill value={s.profile} /></td>
+                    <td className="mono">{s.domain}</td>
+                    <td><StatusPill value={s.status} /></td>
+                    <td>{s.redirect_count}</td>
+                    <td>
+                      <div className="row">
+                        <button
+                          className="small"
+                          disabled={busyKey === deployKey}
+                          onClick={() => runAction(s.project_id, s.profile, 'deploy')}
+                        >
+                          배포
+                        </button>
+                        <button
+                          className="small danger"
+                          disabled={busyKey === stopKey}
+                          onClick={() => runAction(s.project_id, s.profile, 'stop')}
+                        >
+                          중지
+                        </button>
+                        <button
+                          className="small secondary"
+                          onClick={() => setRulesFor({ id: s.project_id, name: s.project_name })}
+                        >
+                          리다이렉트 규칙
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </Async>
+      {rulesFor && (
+        <RedirectRulesModal
+          projectId={rulesFor.id}
+          projectName={rulesFor.name}
+          onClose={() => setRulesFor(null)}
+          onChanged={() => state.reload()}
+        />
+      )}
+    </div>
+  );
+}
+
+function RedirectRulesModal({
+  projectId,
+  projectName,
+  onClose,
+  onChanged,
+}: {
+  projectId: number;
+  projectName: string;
+  onClose: () => void;
+  onChanged: () => void;
+}) {
+  const rules = useApi(() => api.listRedirects(projectId), [projectId]);
+  const [fromPath, setFromPath] = useState('');
+  const [toPath, setToPath] = useState('');
+  const [kind, setKind] = useState<'redirect' | 'rewrite'>('redirect');
+  const [statusCode, setStatusCode] = useState(302);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const add = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError('');
+    try {
+      await api.createRedirect(projectId, fromPath.trim(), toPath.trim(), kind, statusCode);
+      setFromPath('');
+      setToPath('');
+      rules.reload();
+      onChanged();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = async (id: number) => {
+    setBusy(true);
+    try {
+      await api.deleteRedirect(id);
+      rules.reload();
+      onChanged();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal title={`${projectName} — 리다이렉트/재작성 규칙`} onClose={onClose}>
+      <Async state={rules} empty="등록된 규칙이 없습니다.">
+        {(list: RedirectRule[]) => (
+          <table style={{ marginBottom: 14 }}>
+            <thead>
+              <tr>
+                <th>From</th>
+                <th>To</th>
+                <th>종류</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {list.map((r) => (
+                <tr key={r.id}>
+                  <td className="mono">{r.from_path}</td>
+                  <td className="mono">{r.to_path}</td>
+                  <td>
+                    <StatusPill value={r.kind} />
+                    {r.kind === 'redirect' && (
+                      <span className="mutedtext" style={{ marginLeft: 6, fontSize: 11 }}>
+                        {r.status_code}
+                      </span>
+                    )}
+                  </td>
+                  <td>
+                    <button className="small danger" disabled={busy} onClick={() => remove(r.id)}>
+                      삭제
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </Async>
+      <form onSubmit={add} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div className="row">
+          <label className="field" style={{ flex: 1 }}>
+            From 경로
+            <input
+              className="mono"
+              value={fromPath}
+              onChange={(e) => setFromPath(e.target.value)}
+              placeholder="/old"
+              required
+            />
+          </label>
+          <label className="field" style={{ flex: 1 }}>
+            To 경로
+            <input
+              className="mono"
+              value={toPath}
+              onChange={(e) => setToPath(e.target.value)}
+              placeholder="/new"
+              required
+            />
+          </label>
+        </div>
+        <div className="row">
+          <label className="field">
+            종류
+            <select value={kind} onChange={(e) => setKind(e.target.value as 'redirect' | 'rewrite')}>
+              <option value="redirect">redirect (브라우저 리다이렉트)</option>
+              <option value="rewrite">rewrite (내부 재작성)</option>
+            </select>
+          </label>
+          {kind === 'redirect' && (
+            <label className="field">
+              상태 코드
+              <select value={statusCode} onChange={(e) => setStatusCode(Number(e.target.value))}>
+                <option value={301}>301 Permanent</option>
+                <option value={302}>302 Found</option>
+                <option value={307}>307 Temporary</option>
+              </select>
+            </label>
+          )}
+        </div>
+        {error && <p className="error">{error}</p>}
+        <div className="row" style={{ justifyContent: 'flex-end' }}>
+          <button type="button" className="secondary" onClick={onClose}>
+            닫기
+          </button>
+          <button type="submit" disabled={busy}>
+            {busy ? '추가 중...' : '규칙 추가'}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}

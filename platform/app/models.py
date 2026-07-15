@@ -216,6 +216,27 @@ class ModuleBinding(Base):
     env_prefix: Mapped[str] = mapped_column(String(32))  # 예: PAY → PAY_URL, PAY_API_KEY
 
 
+class RedirectKind(str, enum.Enum):
+    redirect = "redirect"  # 브라우저 301/302 리다이렉트
+    rewrite = "rewrite"  # 서버 내부 재작성(클라이언트에 노출 안 됨)
+
+
+class RedirectRule(Base):
+    """프로젝트별 URL redirect/rewrite 규칙. 배포 시 리버스프록시(Caddy/IIS/Apache)
+    사이트 설정에 반영된다 — services/proxy 참고."""
+
+    __tablename__ = "redirect_rules"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), index=True)
+    from_path: Mapped[str] = mapped_column(String(255))
+    to_path: Mapped[str] = mapped_column(String(255))
+    kind: Mapped[RedirectKind] = mapped_column(Enum(RedirectKind), default=RedirectKind.redirect)
+    # redirect일 때만 의미 있음(301/302 등). rewrite는 항상 무시된다.
+    status_code: Mapped[int] = mapped_column(Integer, default=302)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 class PreviewStatus(str, enum.Enum):
     running = "running"
     expired = "expired"

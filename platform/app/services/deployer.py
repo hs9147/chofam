@@ -12,7 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..config import get_settings
-from ..models import BuildProfile, Deployment, DeploymentStatus, EnvVar, Project
+from ..models import BuildProfile, Deployment, DeploymentStatus, EnvVar, Project, RedirectRule
 from ..security import decrypt_value
 from . import proxy
 from .build import PROFILES, BuildError, build_image, checkout, internal_port
@@ -27,9 +27,21 @@ def get_runtime() -> Runtime:
         from .runtime.k8s_runtime import K8sRuntime  # noqa: PLC0415
 
         return K8sRuntime()
+    if settings.runtime_backend == "windows_service":
+        from .runtime.windows_service_runtime import WindowsServiceRuntime  # noqa: PLC0415
+
+        return WindowsServiceRuntime()
     from .runtime.docker_runtime import DockerRuntime  # noqa: PLC0415
 
     return DockerRuntime()
+
+
+def redirects_for(db: Session, project: Project) -> list[RedirectRule]:
+    return list(
+        db.execute(
+            select(RedirectRule).where(RedirectRule.project_id == project.id)
+        ).scalars()
+    )
 
 
 def resolve_env(db: Session, project: Project, profile: BuildProfile) -> dict[str, str]:
@@ -122,7 +134,9 @@ def deploy_sync(
             spec = make_spec(db, project, result.image_tag, profile)
             endpoint = get_runtime().start(spec)
             if get_settings().tier == "small":
-                proxy.configure(project.name, profile, spec.domain, endpoint)
+                proxy.configure(
+                    project.name, profile, spec.domain, endpoint, redirects_for(db, project),
+                )
                 record.host_port = endpoint.port
 
             record.status = DeploymentStatus.running
@@ -220,7 +234,9 @@ def rollback(db: Session, project: Project, profile: BuildProfile) -> Deployment
     spec = make_spec(db, project, target.image_tag, profile)
     endpoint = get_runtime().start(spec)
     if get_settings().tier == "small":
-        proxy.configure(project.name, profile, spec.domain, endpoint)
+        proxy.configure(
+            project.name, profile, spec.domain, endpoint, redirects_for(db, project),
+        )
 
     record = Deployment(
         project_id=project.id,

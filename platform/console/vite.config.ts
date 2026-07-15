@@ -6,6 +6,7 @@ import { defineConfig } from 'vite';
 const API_PREFIXES = [
   '/projects', '/modules', '/llm', '/chat', '/changes', '/previews',
   '/status', '/audit', '/keys', '/health', '/webhooks', '/orgs',
+  '/server-config', '/redirects',
 ];
 
 export default defineConfig({

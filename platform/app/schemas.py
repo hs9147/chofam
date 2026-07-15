@@ -2,7 +2,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from .models import BuildProfile, DeploymentStatus, ProjectType
+from .models import BuildProfile, DeploymentStatus, ProjectType, RedirectKind
 
 
 class OrgCreate(BaseModel):
@@ -181,6 +181,40 @@ class PreviewOut(BaseModel):
     url: str
     status: str
     expires_at: datetime
+
+
+class RedirectRuleCreate(BaseModel):
+    from_path: str = Field(min_length=1, max_length=255)
+    to_path: str = Field(min_length=1, max_length=255)
+    kind: str = Field(default="redirect", pattern=r"^(redirect|rewrite)$")
+    status_code: int = Field(default=302, ge=300, le=399)
+
+
+class RedirectRuleOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    project_id: int
+    from_path: str
+    to_path: str
+    kind: RedirectKind
+    status_code: int
+    created_at: datetime
+
+
+class ServerConfigSite(BaseModel):
+    project_id: int
+    project_name: str
+    profile: BuildProfile
+    domain: str
+    status: str
+    redirect_count: int
+
+
+class ServerConfigOut(BaseModel):
+    runtime_backend: str
+    proxy_backend: str
+    sites: list[ServerConfigSite]
 
 
 class ApiKeyCreate(BaseModel):

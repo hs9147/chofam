@@ -67,10 +67,32 @@ class Settings(BaseSettings):
     build_log_dir: Path = Path("./data/build-logs")
 
     # --- 1차(small) 전용 ---
+    # 실행 런타임: docker(기본, 컨테이너 이미지) | windows_service(Docker 없이 nssm으로
+    # 네이티브 프로세스를 Windows Service로 등록 — IIS 뒤에 배치하는 구성 등)
+    runtime_backend: Literal["docker", "windows_service"] = "docker"
+    # 리버스프록시: caddy(기본) | iis | apache — 운영환경에 맞춰 선택
+    proxy_backend: Literal["caddy", "iis", "apache"] = "caddy"
     caddy_sites_dir: Path = Path("./data/caddy-sites")
     caddy_admin_url: str = "http://127.0.0.1:2019"
     port_range_start: int = 8100
     port_range_end: int = 8999
+
+    # --- windows_service 런타임 전용 ---
+    # nssm(Non-Sucking Service Manager, public domain) 실행 파일 경로. 리포 루트의
+    # paas-start.cmd(관례 — PORT 환경변수로 리슨 포트 전달)를 서비스로 등록해 기동한다.
+    nssm_path: str = "nssm"
+
+    # --- iis 프록시 전용 ---
+    # 사이트별 web.config를 생성해 둘 물리 경로 루트. IIS 사이트의 physicalPath로 쓰인다.
+    iis_sites_root: Path = Path("./data/iis-sites")
+    # IIS 사이트 등록/삭제에 쓰는 appcmd.exe 경로(Windows 전용)
+    iis_appcmd_path: str = r"C:\Windows\System32\inetsrv\appcmd.exe"
+
+    # --- apache 프록시 전용 ---
+    # VirtualHost 설정 파일을 생성해 둘 디렉토리 (예: /etc/apache2/sites-enabled)
+    apache_sites_dir: Path = Path("./data/apache-sites")
+    # 설정 반영 후 실행할 reload 명령 (공백으로 분리해 실행)
+    apache_reload_cmd: str = "apachectl graceful"
 
     # --- 2차(enterprise) 전용 ---
     k8s_namespace: str = "paas-apps"
@@ -126,6 +148,9 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     s = Settings()
-    for d in (s.work_dir, s.build_log_dir, s.caddy_sites_dir, s.k8s_manifest_dir):
+    for d in (
+        s.work_dir, s.build_log_dir, s.caddy_sites_dir, s.k8s_manifest_dir,
+        s.iis_sites_root, s.apache_sites_dir,
+    ):
         d.mkdir(parents=True, exist_ok=True)
     return s

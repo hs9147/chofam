@@ -19,8 +19,10 @@ import type {
   ProjectFilesOut,
   ProjectOut,
   ProjectType,
+  RedirectRule,
   ResourceItem,
   ReviewResult,
+  ServerConfigOut,
   StatusSnapshot,
 } from './types';
 
@@ -221,6 +223,18 @@ export const api = {
     request<PaymentOut[]>('GET', '/payments', undefined, { status, limit }),
   cancelPayment: (paymentKey: string, reason: string) =>
     request<PaymentOut>('POST', `/payments/${paymentKey}/cancel`, { reason }),
+
+  // 서버구성 (런타임/프록시 백엔드 시각화 + redirect/rewrite 규칙)
+  serverConfig: () => request<ServerConfigOut>('GET', '/server-config'),
+  listRedirects: (projectId: number) =>
+    request<RedirectRule[]>('GET', `/projects/${projectId}/redirects`),
+  createRedirect: (
+    projectId: number, from_path: string, to_path: string, kind: string, status_code: number,
+  ) =>
+    request<RedirectRule>('POST', `/projects/${projectId}/redirects`, {
+      from_path, to_path, kind, status_code,
+    }),
+  deleteRedirect: (id: number) => request<void>('DELETE', `/redirects/${id}`),
 
   // 프리뷰
   createPreview: (projectId: number, branch?: string, ttl_minutes = 60) =>
