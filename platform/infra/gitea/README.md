@@ -8,23 +8,71 @@ GitHub을 대신하는 self-host Git 서버. MIT 라이선스로 상용·사내 
 인식하므로(`X-Hub-Signature-256` / `X-Gitea-Signature`, `app/security.py`), 애플리케이션
 변경 없이 아래 배포만으로 연동된다.
 
+## 0. 전용 서버에 Gitea 설치하기 (1차, Docker Compose 기준)
+
+플랫폼과 물리적으로 분리된 **Gitea 전용 서버**를 새로 준비하는 경우의 처음부터 끝까지
+순서다. 플랫폼과 같은 서버에 얹는다면 [deployment-guide.md 3.1절](../../../docs/deployment-guide.md)에서
+Docker·Caddy가 이미 설치됐을 테니 아래 1)·2)는 건너뛰고 3)부터 이어간다
+(2차/K8s로 배포한다면 클러스터가 이미 있다고 가정하므로 이 절 전체가 불필요 — 아래
+"2차 배포" 참고).
+
+**요구 사양**: Gitea는 가볍다 — 1 vCPU / 1~2GB RAM / 저장소 20GB+(리포 규모에 따라 조정)면
+소규모 팀 기준 충분하다. OS는 Ubuntu 22.04 LTS+ 가정(다른 배포판은 패키지 관리자만 바꾸면 된다).
+
+**1) 방화벽 — 필요한 포트만 연다**
+
+```bash
+# 실행 위치: 새로 준비한 서버 셸 (sudo 권한)
+sudo ufw allow 22/tcp      # 관리자 SSH 접속
+sudo ufw allow 80,443/tcp  # Caddy(HTTP→HTTPS 자동 리다이렉트, TLS 자동 발급)
+sudo ufw allow 2222/tcp    # git SSH clone/push (docker-compose.yml이 컨테이너의 22를 여기로 매핑)
+sudo ufw enable
+```
+
+**2) Docker Engine + Caddy 설치**
+
+```bash
+# Docker Engine (docker compose v2 플러그인 포함)
+curl -fsSL https://get.docker.com | sh
+docker compose version   # 설치 확인
+
+# Caddy — 공식 APT 저장소 등록 후 설치 (도메인·TLS 자동 발급용)
+sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https curl
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' \
+  | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' \
+  | sudo tee /etc/apt/sources.list.d/caddy-stable.list
+sudo apt update && sudo apt install -y caddy
+```
+
+**3) DNS**
+
+`git.example.com → 서버 IP` A 레코드 하나만 있으면 된다(레코드 전파에는 보통 수 분~수십 분
+걸릴 수 있다 — 다음 단계로 넘어가기 전에 `dig git.example.com`으로 확인해도 좋다).
+
+이후 절차([어느 걸 쓸지](#어느-걸-쓸지) → [1차 배포](#1차-배포-docker-compose))는
+플랫폼과 같은 서버든 전용 서버든 동일하다.
+
 ## 어느 걸 쓸지
 
 | | 1차(중소규모) | 2차(기업용) |
 | --- | --- | --- |
 | 파일 | `docker-compose.yml` + `Caddyfile.example` | `k8s/*.yaml` |
-| 대상 | 플랫폼과 같은 서버(3.1~3.2절 흐름 그대로) | 플랫폼 K8s 클러스터(6.2절 ingress·cert-manager 재사용 |
+| 대상 | 플랫폼과 같은 서버 또는 전용 서버(위 0절) | 플랫폼 K8s 클러스터(6.2절 ingress·cert-manager 재사용) |
 | DB | 내장 SQLite | 내장 SQLite → 팀 규모가 크면 Postgres로 교체(주석 참고) |
 
 ## 1차 배포 (Docker Compose)
 
+전용 서버라면 이 `chofam` 리포를 그 서버에도 clone하거나(가장 간단) `infra/gitea/`
+디렉터리만 `scp`로 옮겨도 된다 — 이 폴더는 플랫폼 코드와 독립적으로 동작한다.
+
 ```bash
-# 실행 위치: 플랫폼 서버 — /opt/paas/platform/infra/gitea
+# 실행 위치: Gitea를 둘 서버 — infra/gitea 디렉터리
 GITEA_DOMAIN=git.example.com docker compose -f docker-compose.yml up -d
 ```
 
-메인 Caddyfile에 `Caddyfile.example` 내용을 `import`하거나 그대로 복사한다.
-DNS: `git.example.com → 서버 IP` A 레코드 하나면 충분(플랫폼과 같은 서버 전제).
+메인 Caddyfile에 `Caddyfile.example` 내용을 `import`하거나 그대로 복사한다
+(전용 서버라면 `/etc/caddy/Caddyfile`에 직접 추가).
 
 ## 2차 배포 (Kubernetes)
 
