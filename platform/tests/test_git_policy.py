@@ -16,7 +16,15 @@ def _client(monkeypatch, gitea_url: str = "https://git.example.com", internal_on
     return TestClient(create_app())
 
 
-def test_disabled_by_default_any_host_allowed(fresh_settings):
+def test_git_internal_only_defaults_to_true(monkeypatch, fresh_settings):
+    # conftest.py는 정책과 무관한 테스트를 위해 세션 전체에 false를 깔아두므로,
+    # 그 env를 제거해야 config.py의 실제 기본값(true)을 검증할 수 있다.
+    monkeypatch.delenv("PAAS_GIT_INTERNAL_ONLY", raising=False)
+    assert get_settings().git_internal_only is True
+
+
+def test_any_host_allowed_when_explicitly_disabled(monkeypatch, fresh_settings):
+    monkeypatch.setenv("PAAS_GIT_INTERNAL_ONLY", "false")
     get_settings.cache_clear()
     c = TestClient(create_app())
     r = c.post("/projects", json={
@@ -72,6 +80,7 @@ def test_enabled_without_gitea_url_gives_clear_error(monkeypatch, fresh_settings
     assert "PAAS_GITEA_URL" in r.text
 
 
-def test_helper_noop_when_disabled(fresh_settings):
+def test_helper_noop_when_disabled(monkeypatch, fresh_settings):
+    monkeypatch.setenv("PAAS_GIT_INTERNAL_ONLY", "false")
     get_settings.cache_clear()
     enforce_internal_git_url("https://anywhere.example.com/x")  # 예외 없이 통과해야 함

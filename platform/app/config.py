@@ -124,7 +124,9 @@ class Settings(BaseSettings):
     # 기업용 거버넌스: true면 프로젝트 등록 시 git_url 호스트가 gitea_url과 일치해야
     # 한다(github.com 등 외부 호스트 등록을 422로 거부). "소스가 사외로 나가지 않는다"는
     # 보장을 internal LLM 강제(schemas.py)와 동일한 원칙으로 git 저장소에도 적용한다.
-    git_internal_only: bool = False
+    # 기본값 true — 사내 Gitea 미설정 시(PAAS_GITEA_URL 없음) 등록 자체를 503으로 막는
+    # 안전한 실패가 기본. 외부 git 호스트를 허용하려면 명시적으로 false로 설정할 것.
+    git_internal_only: bool = True
 
     # release 빌드 기본 리소스 (development는 build.py의 프로필 정의가 절반 수준으로 축소)
     default_memory_limit: str = "1g"

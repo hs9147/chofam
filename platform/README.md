@@ -222,9 +222,11 @@ npm run build        # tsc 타입체크 + vite build → dist/
   Docker Compose(1차)/K8s manifests(2차) + 웹훅·Keycloak SSO 연동은
   [`infra/gitea/README.md`](infra/gitea/README.md) 참고. `PAAS_GITEA_URL`을 설정하면
   콘솔 상단 메뉴에 **Git** 탭이 나타나 등록된 프로젝트별 리포 바로가기를 보여준다.
-- **코드 내부 관리 강제**: `PAAS_GIT_INTERNAL_ONLY=true` + `PAAS_GITEA_URL` 설정 시
-  프로젝트 등록 단계에서 `git_url` 호스트가 사내 Gitea와 다르면 422로 거부(github.com 등
-  외부 호스트 등록 원천 차단). internal LLM 프로바이더 강제(12절)와 동일한 원칙.
+- **코드 내부 관리 강제(기본값 켜짐)**: `PAAS_GIT_INTERNAL_ONLY` 기본값이 `true`라
+  `PAAS_GITEA_URL`을 설정하지 않으면 프로젝트 등록 자체가 503으로 막히고, 설정했다면
+  `git_url` 호스트가 사내 Gitea와 다를 때 422로 거부한다(github.com 등 외부 호스트 등록
+  원천 차단). internal LLM 프로바이더 강제(12절)와 동일한 원칙 — 외부 호스트를 허용하려면
+  `PAAS_GIT_INTERNAL_ONLY=false`로 명시적으로 꺼야 한다.
 - **조직별 작업공간**: 콘솔의 조직 페이지(admin)에서 조직을 만들면 사내 Gitea에 동일한
   이름의 Organization이 함께 생성된다(`PAAS_GITEA_API_TOKEN` 필요). 조직 소속 프로젝트는
   리포를 플랫폼이 내부에서 자동 생성·관리하며, git_url 등 메타 정보는 **일반 사용자
