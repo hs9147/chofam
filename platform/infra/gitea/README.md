@@ -8,6 +8,25 @@ GitHub을 대신하는 self-host Git 서버. MIT 라이선스로 상용·사내 
 인식하므로(`X-Hub-Signature-256` / `X-Gitea-Signature`, `app/security.py`), 애플리케이션
 변경 없이 아래 배포만으로 연동된다.
 
+## 0. 서버 준비 — Docker 설치
+
+Gitea를 플랫폼과 같은 서버에 둔다면 [deployment-guide.md 3.1절](../../../docs/deployment-guide.md)에서
+이미 Docker Engine을 설치했을 것이므로 이 단계는 건너뛴다. **별도 서버**에 Gitea만 둔다면
+그 서버에도 동일하게 설치한다(2차/K8s 경로는 클러스터가 이미 있다고 가정하므로 이 단계 자체가 불필요):
+
+```bash
+# 실행 위치: Gitea를 둘 서버 셸 (Ubuntu 22.04+ 기준)
+curl -fsSL https://get.docker.com | sh
+# docker compose(v2) 플러그인이 함께 설치된다 — 별도 설치 불필요
+docker compose version
+```
+
+리버스프록시(Caddy)도 필요하다 — 플랫폼과 같은 서버라면 3.1절에서 이미 설치됐고,
+별도 서버라면 `sudo apt install -y caddy`(Caddy 공식 APT 저장소 사전 등록 필요,
+[공식 설치 문서](https://caddyserver.com/docs/install#debian-ubuntu-raspbian) 참고)로 설치한다.
+
+DNS: `git.example.com → 서버 IP` A 레코드 하나만 있으면 된다(아래 절에서 다시 언급).
+
 ## 어느 걸 쓸지
 
 | | 1차(중소규모) | 2차(기업용) |
