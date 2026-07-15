@@ -48,3 +48,21 @@ def test_dev_templates_run_dev_servers():
     assert "npm" in react_dev and "dev" in react_dev
     assert "--reload" in python_dev
     assert "--workers" in python_rel and "--reload" not in python_rel
+
+
+def test_html_serves_static_files_port_80():
+    assert internal_port(ProjectType.html, BuildProfile.release) == 80
+    assert internal_port(ProjectType.html, BuildProfile.development) == 80
+    for profile in ("development", "release"):
+        content = (TEMPLATE_DIR / f"html.{profile}.Dockerfile").read_text(encoding="utf-8")
+        assert "caddy" in content and "file-server" in content
+
+
+def test_streamlit_runs_via_streamlit_cli_port_8501():
+    assert internal_port(ProjectType.streamlit, BuildProfile.release) == 8501
+    assert internal_port(ProjectType.streamlit, BuildProfile.development) == 8501
+    dev = (TEMPLATE_DIR / "streamlit.development.Dockerfile").read_text(encoding="utf-8")
+    rel = (TEMPLATE_DIR / "streamlit.release.Dockerfile").read_text(encoding="utf-8")
+    assert "streamlit" in dev and "--server.runOnSave=true" in dev
+    assert "streamlit" in rel and "--server.runOnSave=true" not in rel
+    assert "--server.port=8501" in dev and "--server.port=8501" in rel

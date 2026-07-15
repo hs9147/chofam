@@ -31,6 +31,10 @@ INTERNAL_PORTS: dict[tuple[ProjectType, BuildProfile], int] = {
     (ProjectType.python, BuildProfile.release): 8000,
     (ProjectType.llm, BuildProfile.development): 8000,
     (ProjectType.llm, BuildProfile.release): 8000,
+    (ProjectType.html, BuildProfile.development): 80,
+    (ProjectType.html, BuildProfile.release): 80,
+    (ProjectType.streamlit, BuildProfile.development): 8501,
+    (ProjectType.streamlit, BuildProfile.release): 8501,
 }
 
 

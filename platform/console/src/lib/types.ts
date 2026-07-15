@@ -1,6 +1,6 @@
 // platform/app/schemas.py 미러 — 백엔드 스키마 변경 시 이 파일을 함께 갱신한다.
 
-export type ProjectType = 'react' | 'python' | 'node' | 'llm';
+export type ProjectType = 'react' | 'python' | 'node' | 'llm' | 'html' | 'streamlit';
 export type BuildProfile = 'development' | 'release';
 export type DeploymentStatus = 'building' | 'running' | 'failed' | 'stopped';
 

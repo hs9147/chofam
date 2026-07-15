@@ -158,8 +158,10 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
           타입
           <select value={form.type} onChange={(e) => set('type', e.target.value)}>
             <option value="react">react</option>
-            <option value="python">python</option>
+            <option value="python">python (FastAPI)</option>
+            <option value="streamlit">streamlit</option>
             <option value="node">node</option>
+            <option value="html">html (정적)</option>
             <option value="llm">llm</option>
           </select>
         </label>

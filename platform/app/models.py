@@ -16,6 +16,8 @@ class ProjectType(str, enum.Enum):
     python = "python"
     node = "node"
     llm = "llm"
+    html = "html"  # 정적 HTML/CSS/JS — 빌드 단계 없이 그대로 서빙
+    streamlit = "streamlit"  # Streamlit 앱 (streamlit run) — python(FastAPI) 타입과는 별개
 
 
 class BuildProfile(str, enum.Enum):
