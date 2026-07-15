@@ -22,12 +22,20 @@ def test_profile_env_split():
     assert PROFILES[BuildProfile.release].replicas >= 2
 
 
-@pytest.mark.parametrize("ptype", list(ProjectType))
+@pytest.mark.parametrize("ptype", [t for t in ProjectType if t != ProjectType.composite])
 @pytest.mark.parametrize("profile", list(BuildProfile))
 def test_every_type_profile_has_template(ptype, profile, tmp_path):
     df = dockerfile_for(ptype, profile, tmp_path)
     assert df.exists()
     assert df.parent == TEMPLATE_DIR
+
+
+def test_composite_has_no_toplevel_template(tmp_path):
+    """composite는 리포 루트 Dockerfile이 없다 — backend/, frontend/ 서브폴더를
+    각각 감지된 타입의 템플릿으로 빌드한다(services/build.py의
+    detect_composite_components 참고)."""
+    with pytest.raises(FileNotFoundError):
+        dockerfile_for(ProjectType.composite, BuildProfile.release, tmp_path)
 
 
 def test_repo_dockerfile_takes_precedence(tmp_path):

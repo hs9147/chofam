@@ -10,6 +10,11 @@ os.environ.setdefault("PAAS_ADMIN_API_KEY", "test-admin-key")
 os.environ.setdefault("PAAS_WEBHOOK_SECRET", "test-webhook-secret")
 os.environ.setdefault("PAAS_BASE_DOMAIN", "apps.test")
 os.environ.setdefault("PAAS_TOSS_SECRET_KEY", "test_sk_dummy")
+# 운영 기본값은 true(PAAS_GITEA_URL 미설정 시 프로젝트 등록 자체를 503으로 막음)이지만,
+# git 정책과 무관한 대다수 테스트가 PAAS_GITEA_URL 없이 임의 git_url로 프로젝트를 만든다 —
+# 정책 자체를 검증하는 test_git_policy.py/test_project_org_flow.py는 필요시 개별적으로
+# monkeypatch로 켠다.
+os.environ.setdefault("PAAS_GIT_INTERNAL_ONLY", "false")
 
 import pytest  # noqa: E402
 

@@ -7,7 +7,7 @@ from sqlalchemy import select
 from .. import audit
 from ..config import get_settings
 from ..db import SessionLocal
-from ..models import Project
+from ..models import Project, ProjectType
 from ..security import verify_webhook_signature
 from ..services import deployer
 
@@ -53,7 +53,10 @@ def _deploy_task(project_id: int) -> None:
         if project is None:
             return
         try:
-            deployer.deploy_sync(db, project, project.default_profile)
+            if project.type == ProjectType.composite:
+                deployer.deploy_composite_sync(db, project, project.default_profile)
+            else:
+                deployer.deploy_sync(db, project, project.default_profile)
         except deployer.DeployInProgress:
             # 연속 push: 진행 중 배포가 최신 커밋을 집도록 두고 이번 이벤트는 스킵
             pass

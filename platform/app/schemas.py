@@ -94,6 +94,8 @@ class DeploymentOut(BaseModel):
     error: str | None
     created_at: datetime
     finished_at: datetime | None
+    # composite 프로젝트에서만 값이 있음 — "backend"/"frontend". 일반 프로젝트는 None.
+    component: str | None = None
 
 
 class EnvVarSet(BaseModel):
@@ -202,6 +204,12 @@ class RedirectRuleOut(BaseModel):
     created_at: datetime
 
 
+class ComponentStatus(BaseModel):
+    name: str  # "backend" | "frontend"
+    status: str
+    internal_port: int | None = None
+
+
 class ServerConfigSite(BaseModel):
     project_id: int
     project_name: str
@@ -209,6 +217,8 @@ class ServerConfigSite(BaseModel):
     domain: str
     status: str
     redirect_count: int
+    # composite 프로젝트만 채워짐(backend/frontend 개별 상태) — 일반 프로젝트는 None.
+    components: list[ComponentStatus] | None = None
 
 
 class ServerConfigOut(BaseModel):

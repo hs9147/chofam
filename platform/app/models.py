@@ -18,6 +18,9 @@ class ProjectType(str, enum.Enum):
     llm = "llm"
     html = "html"  # 정적 HTML/CSS/JS — 빌드 단계 없이 그대로 서빙
     streamlit = "streamlit"  # Streamlit 앱 (streamlit run) — python(FastAPI) 타입과는 별개
+    composite = "composite"  # 백엔드+프론트엔드 복합 — 리포 안 backend/, frontend/ 서브폴더를
+    # 자동 감지해 두 컴포넌트를 각각 빌드·배포한다 (services/build.py의
+    # detect_composite_components, services/deployer.py의 deploy_composite_sync 참고)
 
 
 class BuildProfile(str, enum.Enum):
@@ -95,6 +98,14 @@ class Deployment(Base):
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # composite 프로젝트 전용 — "backend"/"frontend" 중 어느 컴포넌트의 배포 행인지.
+    # 일반(단일 컴포넌트) 프로젝트는 항상 None(기존 조회 결과 불변).
+    component: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    # 같은 배포 시도에서 함께 만들어진 backend/frontend 행을 묶는 상관키(uuid4 hex).
+    deploy_group_id: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
+    # composite 컴포넌트의 컨테이너 내부 포트 — 롤백/복구 시 리포를 다시 체크아웃해
+    # 타입을 재감지하지 않고도 이 값으로 바로 재기동할 수 있도록 빌드 시점에 저장한다.
+    internal_port: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     project: Mapped[Project] = relationship(back_populates="deployments")
 

@@ -28,12 +28,15 @@ class RuntimeSpec:
     replicas: int = 1
     gpu: bool = False
     health_check_path: str = "/"
+    # composite 프로젝트에서만 사용 — "backend"/"frontend". 일반 프로젝트는 None.
+    component: str | None = None
 
     @property
     def unit_name(self) -> str:
         """컨테이너/K8s 리소스 이름. 프로필별로 분리해 dev·release 동시 기동을 허용한다."""
         suffix = "-dev" if self.profile == BuildProfile.development else ""
-        return f"paas-{self.project_name}{suffix}"
+        component = f"-{self.component}" if self.component else ""
+        return f"paas-{self.project_name}{component}{suffix}"
 
 
 @dataclass

@@ -222,9 +222,11 @@ npm run build        # tsc 타입체크 + vite build → dist/
   Docker Compose(1차)/K8s manifests(2차) + 웹훅·Keycloak SSO 연동은
   [`infra/gitea/README.md`](infra/gitea/README.md) 참고. `PAAS_GITEA_URL`을 설정하면
   콘솔 상단 메뉴에 **Git** 탭이 나타나 등록된 프로젝트별 리포 바로가기를 보여준다.
-- **코드 내부 관리 강제**: `PAAS_GIT_INTERNAL_ONLY=true` + `PAAS_GITEA_URL` 설정 시
-  프로젝트 등록 단계에서 `git_url` 호스트가 사내 Gitea와 다르면 422로 거부(github.com 등
-  외부 호스트 등록 원천 차단). internal LLM 프로바이더 강제(12절)와 동일한 원칙.
+- **코드 내부 관리 강제(기본값 켜짐)**: `PAAS_GIT_INTERNAL_ONLY` 기본값이 `true`라
+  `PAAS_GITEA_URL`을 설정하지 않으면 프로젝트 등록 자체가 503으로 막히고, 설정했다면
+  `git_url` 호스트가 사내 Gitea와 다를 때 422로 거부한다(github.com 등 외부 호스트 등록
+  원천 차단). internal LLM 프로바이더 강제(12절)와 동일한 원칙 — 외부 호스트를 허용하려면
+  `PAAS_GIT_INTERNAL_ONLY=false`로 명시적으로 꺼야 한다.
 - **조직별 작업공간**: 콘솔의 조직 페이지(admin)에서 조직을 만들면 사내 Gitea에 동일한
   이름의 Organization이 함께 생성된다(`PAAS_GITEA_API_TOKEN` 필요). 조직 소속 프로젝트는
   리포를 플랫폼이 내부에서 자동 생성·관리하며, git_url 등 메타 정보는 **일반 사용자
@@ -257,11 +259,22 @@ npm run build        # tsc 타입체크 + vite build → dist/
   환경변수로 리슨 포트 전달) 관례로 기동하며, IIS는 `web.config`(URL Rewrite)+appcmd,
   Apache는 VirtualHost(mod_proxy/mod_rewrite)+`apachectl graceful`로 사이트를
   등록·반영한다. `GET /server-config`가 현재 선택된 백엔드와 프로젝트별(프로필별)
-  도메인·실행 상태·리다이렉트 규칙 수를 한 화면에서 보여준다(콘솔 "서버구성" 메뉴).
+  도메인·실행 상태·리다이렉트 규칙 수를 한 화면에서 보여주고, 콘솔 "서버구성" 메뉴는
+  이를 표와 함께 proxy → 사이트 → runtime 관계를 그리는 토폴로지 다이어그램(순수 SVG,
+  신규 의존성 없음)으로도 시각화한다.
 - **프로젝트별 URL redirect/rewrite 규칙**: `POST/GET /projects/{id}/redirects`,
   `DELETE /redirects/{id}`로 등록하면 다음 배포·롤백 때 선택된 프록시 백엔드 설정에
   자동 반영된다(Caddy `redir`/`rewrite`, IIS URL Rewrite rule, Apache
   `Redirect`/`RewriteRule`).
+- **복합(백엔드+프론트엔드) 프로젝트**: `type: composite`로 등록하면 리포 루트의
+  `backend/`, `frontend/` 서브폴더를 배포 시점에 자동 감지(시그니처 파일 기준 —
+  requirements.txt/pyproject.toml→python, package.json+react 의존성→react,
+  package.json만→node, index.html만→html)해 각각 별도 이미지로 빌드·기동하고, 같은
+  도메인 아래 `/api/*`는 백엔드로, `/*`는 프론트엔드로 자동 라우팅한다(Caddy
+  `handle_path`/IIS URL Rewrite 조건부 규칙/Apache `ProxyPass` 접두사 — 세 프록시
+  백엔드 모두 지원). 배포는 원자적이다: 한쪽이 실패하면 실패한 컴포넌트만 재빌드 없이
+  직전 정상 이미지로 복구한 뒤에만 프록시를 갱신하므로, 부분 실패가 서비스 중단으로
+  이어지지 않는다(`app/services/deployer.py`의 `deploy_composite_sync` 참고).
 - **OIDC/RBAC (Keycloak 호환)**: `PAAS_OIDC_ISSUER` 설정 시 `Authorization: Bearer <JWT>`
   인증 병행. `realm_access.roles`에 `PAAS_OIDC_ADMIN_ROLE`(기본 paas-admin)이 있으면 admin.
 - **비동기 배포**: `POST /projects/{id}/deploy`에 `"wait": false` → 202 즉시 반환,

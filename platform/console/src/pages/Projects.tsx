@@ -170,8 +170,17 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
             <option value="node">node</option>
             <option value="html">html (정적)</option>
             <option value="llm">llm</option>
+            <option value="composite">복합 — 백엔드+프론트엔드</option>
           </select>
         </label>
+        {form.type === 'composite' && (
+          <p className="mutedtext">
+            리포 루트에 <code>backend/</code>, <code>frontend/</code> 서브폴더가 모두 있어야
+            합니다 — 배포 시 각 폴더의 타입(python/node/react/html)을 자동 감지해 따로
+            빌드하고, 같은 도메인에서 <code>/api/*</code>는 백엔드로, <code>/*</code>는
+            프론트엔드로 자동 라우팅합니다.
+          </p>
+        )}
 
         {orgs.data && orgs.data.length > 0 && (
           <label className="field">

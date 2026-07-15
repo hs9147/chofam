@@ -1,6 +1,6 @@
 // platform/app/schemas.py 미러 — 백엔드 스키마 변경 시 이 파일을 함께 갱신한다.
 
-export type ProjectType = 'react' | 'python' | 'node' | 'llm' | 'html' | 'streamlit';
+export type ProjectType = 'react' | 'python' | 'node' | 'llm' | 'html' | 'streamlit' | 'composite';
 export type BuildProfile = 'development' | 'release';
 export type DeploymentStatus = 'building' | 'running' | 'failed' | 'stopped';
 
@@ -47,6 +47,8 @@ export interface DeploymentOut {
   error: string | null;
   created_at: string;
   finished_at: string | null;
+  // composite 프로젝트에서만 값이 있음 — "backend" | "frontend"
+  component?: string | null;
 }
 
 export interface EnvVarRow {
@@ -128,6 +130,13 @@ export interface ProjectFileContentOut {
   content: string;
 }
 
+// composite 프로젝트의 컴포넌트별 상태 — 서버구성 표 + 토폴로지 다이어그램이 함께 쓴다
+export interface ComponentStatus {
+  name: string; // "backend" | "frontend"
+  status: string;
+  internal_port: number | null;
+}
+
 // 서버구성 시각화 — 런타임/프록시 백엔드 + 등록된 사이트(라우팅 항목) 목록
 export interface ServerConfigSite {
   project_id: number;
@@ -136,6 +145,8 @@ export interface ServerConfigSite {
   domain: string;
   status: string;
   redirect_count: number;
+  // composite 프로젝트만 채워짐 — 일반 프로젝트는 null
+  components: ComponentStatus[] | null;
 }
 
 export interface ServerConfigOut {
