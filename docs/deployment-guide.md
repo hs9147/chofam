@@ -138,6 +138,7 @@ cp .env.example .env
 | `PAAS_TIER` | 선택 | `small`(기본, Docker) / `enterprise`(K8s) |
 | `PAAS_HOST_OS` | 선택 | 기본 `auto` 감지. 컨테이너 안 등 감지가 틀릴 때만 명시 |
 | `PAAS_DATABASE_URL` | 선택 | 기본 SQLite. 규모 커지면 PostgreSQL DSN |
+| `PAAS_GIT_INTERNAL_ONLY` | 선택 | 기본 `true` — 프로젝트 `git_url`이 사내 Gitea(`PAAS_GITEA_URL`, 3.8절) 호스트가 아니면 등록 자체를 거부한다. 아직 사내 Gitea를 안 붙였고 3.3절처럼 GitHub 등 외부 리포로 우선 테스트하려면 `false`로 낮출 것 |
 
 필수 키 생성 명령:
 
@@ -160,6 +161,11 @@ cd /opt/paas/platform/console && npm install && npm run build
 ```
 
 ### 3.3 프로젝트 등록 → 배포 → 확인 (FastAPI 앱 예시)
+
+아래는 외부 GitHub 리포를 직접 등록하는 가장 단순한 경로다 — `PAAS_GIT_INTERNAL_ONLY`
+기본값(`true`)에서는 사내 Gitea 호스트가 아니면 거부되므로, 사내 Gitea를 아직 3.8절대로
+붙이지 않았다면 `.env`에 `PAAS_GIT_INTERNAL_ONLY=false`를 먼저 설정해야 이 예시가 통과한다
+(사내 Gitea 준비가 끝났다면 이 값은 다시 켜 두는 것을 권장 — 15절 참고).
 
 ```bash
 # 실행 위치: 아무 곳이나 — 플랫폼 API 호출이므로 curl만 있으면 됨 (콘솔 UI로도 동일 작업 가능)
