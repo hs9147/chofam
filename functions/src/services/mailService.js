@@ -60,7 +60,10 @@ function renderTemplate(text, data) {
 }
 
 async function dispatch({ to, templateKey, location = 'ko', dynamicData = {}, source }) {
-  console.log(`Sending email to ${to} (templateKey: ${templateKey}, location: ${location})`);
+  console.log(
+    `Sending email to ${to} (templateKey: ${templateKey}, location: ${location}, source: ${source}) `
+    + `dynamicData: ${JSON.stringify(dynamicData)}`
+  );
 
   // Prefetch template (using cache)
   const templateData = await getTemplate(templateKey);
