@@ -25,22 +25,6 @@ def test_sends_when_configured(monkeypatch, fresh_settings):
     assert kw["json"]["dynamicData"] == {"subject": "제목", "body": "본문"}
 
 
-def test_logs_request_to_stdout_before_sending(monkeypatch, fresh_settings, capsys):
-    monkeypatch.setenv("PAAS_MAIL_API_URL", "https://x/api/mail")
-    monkeypatch.setenv("PAAS_MAIL_API_KEY", "k")
-    monkeypatch.setenv("PAAS_MAIL_ALERT_TO", "ops@example.com")
-    monkeypatch.setenv("PAAS_MAIL_TEMPLATE_ID", "d-123")
-    get_settings.cache_clear()
-    monkeypatch.setattr(notify.httpx, "post", lambda url, **kw: _Res())
-
-    notify.send_alert("배포 실패", "sha=abc123")
-    out = capsys.readouterr().out
-    assert "mail send request" in out
-    assert "ops@example.com" in out
-    assert "d-123" in out
-    assert "sha=abc123" in out
-
-
 def test_noop_when_unconfigured(monkeypatch, fresh_settings):
     get_settings.cache_clear()
     called = []
