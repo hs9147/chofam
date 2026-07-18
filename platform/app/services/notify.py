@@ -16,20 +16,17 @@ def send_alert(subject: str, body: str) -> bool:
     if not (settings.mail_api_url and settings.mail_api_key and settings.mail_alert_to
             and settings.mail_template_id):
         return False
-    payload = {
-        "to": settings.mail_alert_to,
-        "templateId": settings.mail_template_id,
-        "dynamicData": {"subject": subject, "body": body},
-    }
-    print(f"[paas] mail send request: to={payload['to']} templateId={payload['templateId']} "
-          f"subject={subject!r} body={body!r}")
     try:
         from .httpx_retry import post_with_retry  # noqa: PLC0415
 
         res = post_with_retry(
             f"{settings.mail_api_url.rstrip('/')}/send",
             headers={"x-api-key": settings.mail_api_key},
-            json=payload,
+            json={
+                "to": settings.mail_alert_to,
+                "templateId": settings.mail_template_id,
+                "dynamicData": {"subject": subject, "body": body},
+            },
             timeout=10,
         )
         return res.status_code < 400
