@@ -75,9 +75,10 @@ def test_render_outline_indents_and_truncates():
 def _init_repo(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
     subprocess.run(["git", "init", "-q", "-b", "main", str(path)], check=True)
-    (path / "svc.py").write_text('"""서비스."""\ndef handler(req):\n    return req\n')
-    (path / "ui.tsx").write_text("export function App() {}\n")
-    (path / "data.json").write_text("{}\n")  # 데이터 파일은 트리에서 제외되어야 함
+    # encoding 명시 필수 — Windows 기본 인코딩(cp1252)은 한글을 못 써서 UnicodeEncodeError.
+    (path / "svc.py").write_text('"""서비스."""\ndef handler(req):\n    return req\n', encoding="utf-8")
+    (path / "ui.tsx").write_text("export function App() {}\n", encoding="utf-8")
+    (path / "data.json").write_text("{}\n", encoding="utf-8")  # 데이터 파일은 트리에서 제외되어야 함
     subprocess.run(["git", "add", "-A"], cwd=path, check=True)
     subprocess.run(
         ["git", "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "init"],

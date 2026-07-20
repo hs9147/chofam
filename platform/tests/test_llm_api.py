@@ -151,7 +151,10 @@ def test_chat_context_includes_code_structure_outline(monkeypatch, tmp_path):
     repo = tmp_path / "ws"
     repo.mkdir()
     subprocess.run(["git", "init", "-q", "-b", "main", str(repo)], check=True)
-    (repo / "svc.py").write_text('"""결제 서비스."""\ndef charge(amount):\n    return amount\n')
+    # encoding 명시 필수 — Windows 기본 인코딩(cp1252)은 한글을 못 써서 UnicodeEncodeError.
+    (repo / "svc.py").write_text(
+        '"""결제 서비스."""\ndef charge(amount):\n    return amount\n', encoding="utf-8"
+    )
     subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
     subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t",
                     "commit", "-q", "-m", "init"], cwd=repo, check=True)
