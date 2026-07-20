@@ -51,38 +51,38 @@ def _auth(token: str) -> dict:
 
 def test_member_role_can_list_but_not_audit(oidc_client):
     token = _token(["developer"])
-    assert oidc_client.get("/projects", headers=_auth(token)).status_code == 200
-    assert oidc_client.get("/audit", headers=_auth(token)).status_code == 403
+    assert oidc_client.get("/paas/api/v1/projects", headers=_auth(token)).status_code == 200
+    assert oidc_client.get("/paas/api/v1/audit", headers=_auth(token)).status_code == 403
 
 
 def test_admin_role_grants_admin(oidc_client):
     token = _token(["developer", "paas-admin"])
-    assert oidc_client.get("/audit", headers=_auth(token)).status_code == 200
+    assert oidc_client.get("/paas/api/v1/audit", headers=_auth(token)).status_code == 200
     # 감사 로그에 OIDC 사용자명이 기록되는지 — 키 발급으로 확인
-    r = oidc_client.post("/keys", json={"name": "from-oidc"}, headers=_auth(token))
+    r = oidc_client.post("/paas/api/v1/keys", json={"name": "from-oidc"}, headers=_auth(token))
     assert r.status_code == 201
-    rows = oidc_client.get("/audit", headers=_auth(token)).json()
+    rows = oidc_client.get("/paas/api/v1/audit", headers=_auth(token)).json()
     assert any(a["actor"] == "hong" and a["action"] == "key.issue" for a in rows)
 
 
 def test_expired_token_rejected(oidc_client):
     token = _token(["paas-admin"], exp_offset=-60)
-    assert oidc_client.get("/projects", headers=_auth(token)).status_code == 401
+    assert oidc_client.get("/paas/api/v1/projects", headers=_auth(token)).status_code == 401
 
 
 def test_wrong_issuer_rejected(oidc_client):
     token = _token(["developer"], issuer="https://evil.test")
-    assert oidc_client.get("/projects", headers=_auth(token)).status_code == 401
+    assert oidc_client.get("/paas/api/v1/projects", headers=_auth(token)).status_code == 401
 
 
 def test_bearer_rejected_when_oidc_not_configured(fresh_settings, monkeypatch):
     monkeypatch.delenv("PAAS_OIDC_ISSUER", raising=False)
     get_settings.cache_clear()
     c = TestClient(create_app())
-    r = c.get("/projects", headers=_auth(_token(["developer"])))
+    r = c.get("/paas/api/v1/projects", headers=_auth(_token(["developer"])))
     assert r.status_code == 401
     assert "OIDC not configured" in r.json()["detail"]
 
 
 def test_api_key_still_works_alongside_oidc(oidc_client):
-    assert oidc_client.get("/projects", headers={"x-api-key": "test-admin-key"}).status_code == 200
+    assert oidc_client.get("/paas/api/v1/projects", headers={"x-api-key": "test-admin-key"}).status_code == 200

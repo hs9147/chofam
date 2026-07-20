@@ -1,12 +1,8 @@
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vitest/config';
 
-// 백엔드에 공통 /api prefix가 없으므로 라우터 prefix를 열거해 프록시한다
-const API_PREFIXES = [
-  '/projects', '/modules', '/llm', '/chat', '/changes', '/previews',
-  '/status', '/audit', '/keys', '/health', '/webhooks', '/orgs',
-  '/server-config', '/redirects',
-];
+// 백엔드 라우터는 모두 /paas 아래 마운트된다(app/main.py의 PAAS_PREFIX와 동일해야 함).
+const API_PREFIXES = ['/paas'];
 
 export default defineConfig({
   plugins: [react()],

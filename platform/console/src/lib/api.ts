@@ -26,6 +26,17 @@ import type {
   StatusSnapshot,
 } from './types';
 
+// 백엔드 라우터는 모두 /paas 아래 마운트된다. /health, /status는 버전 prefix 없이
+// /paas만 받는다(로드밸런서/k8s probe 및 로그인 프로브가 버전과 무관한 고정 경로를 기대함) —
+// 나머지는 /paas/api/v1. app/main.py의 PAAS_PREFIX/API_PREFIX와 반드시 맞출 것.
+const PAAS_PREFIX = '/paas';
+const API_BASE = `${PAAS_PREFIX}/api/v1`;
+const UNVERSIONED_PATHS = new Set(['/health', '/status']);
+
+function apiUrl(path: string): string {
+  return UNVERSIONED_PATHS.has(path) ? `${PAAS_PREFIX}${path}` : `${API_BASE}${path}`;
+}
+
 export class ApiError extends Error {
   status: number;
   constructor(status: number, detail: string) {
@@ -62,7 +73,7 @@ async function request<T>(
   body?: unknown,
   query?: Record<string, string | number | undefined>,
 ): Promise<T> {
-  let url = path;
+  let url = apiUrl(path);
   if (query) {
     const params = new URLSearchParams();
     for (const [k, v] of Object.entries(query)) {
@@ -103,7 +114,7 @@ async function request<T>(
 }
 
 async function requestMultipart<T>(path: string, formData: FormData): Promise<T> {
-  const res = await fetch(path, {
+  const res = await fetch(apiUrl(path), {
     method: 'POST',
     headers: { 'x-api-key': getKey() },
     body: formData,

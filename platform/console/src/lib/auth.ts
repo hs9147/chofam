@@ -22,7 +22,7 @@ export function logout(): void {
 }
 
 export async function login(key: string): Promise<{ admin: boolean }> {
-  const res = await fetch('/status', { headers: { 'x-api-key': key } });
+  const res = await fetch('/paas/status', { headers: { 'x-api-key': key } });
   if (res.status === 200 || res.status === 403) {
     const admin = res.status === 200;
     sessionStorage.setItem(KEY, key);
