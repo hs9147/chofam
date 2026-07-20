@@ -125,6 +125,38 @@ export interface ProjectFilesOut {
   files: string[];
 }
 
+// 코드 구조 시각화 — 정적 파싱으로 만든 파일→클래스/함수 계층 트리(요청 1)
+export interface CodeMapNode {
+  kind: 'class' | 'function' | 'method';
+  name: string;
+  signature: string;
+  doc: string;
+  lineno: number;
+  children: CodeMapNode[];
+}
+
+export interface CodeMapFile {
+  path: string;
+  lang: string;
+  summary: string;
+  children: CodeMapNode[];
+}
+
+export interface CodeMapOut {
+  files: CodeMapFile[];
+}
+
+// 외부 API 디렉터리 검색 결과(요청 3)
+export interface ApiSearchResult {
+  id: string;
+  title: string;
+  description: string;
+  provider: string;
+  categories: string[];
+  homepage: string;
+  spec_url: string;
+}
+
 export interface ProjectFileContentOut {
   path: string;
   content: string;

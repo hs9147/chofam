@@ -5,8 +5,9 @@ from sqlalchemy.orm import Session
 from .. import audit
 from ..db import get_db
 from ..models import ApiKey, Module, ModuleBinding, ModuleType, Organization, Project
-from ..schemas import ModuleBind, ModuleCreate
-from ..security import require_api_key
+from ..schemas import ApiModuleImport, ModuleBind, ModuleCreate
+from ..security import require_admin, require_api_key
+from ..services import apisearch
 from ..services import modules as svc
 
 router = APIRouter(tags=["modules"])
@@ -69,6 +70,43 @@ def bind_module(
                  {"module": module.name, "prefix": body.env_prefix})
     # 주입될 환경변수 키를 미리 보여준다 (값은 배포 시에만 주입)
     return {"injected_env": sorted(svc.binding_env(module, body.env_prefix).keys())}
+
+
+@router.get("/modules/search")
+def search_external_apis(
+    keyword: str,
+    _: ApiKey = Depends(require_admin),
+):
+    """키워드로 외부 API 디렉터리를 검색한다(요청 3). 아웃바운드 조회이므로 admin 전용.
+
+    반환된 항목은 POST /modules/import로 external_api 모듈에 추가할 수 있다."""
+    try:
+        return {"results": apisearch.search_apis(keyword)}
+    except apisearch.ApiSearchError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+
+@router.post("/modules/import", status_code=201)
+def import_api_module(
+    body: ApiModuleImport,
+    db: Session = Depends(get_db),
+    admin: ApiKey = Depends(require_admin),
+):
+    """검색 결과를 external_api 모듈로 자동 추가한다 — 이름은 모듈명 규약으로 정규화."""
+    name = apisearch.normalize_module_name(body.name)
+    base, suffix = name, 2
+    while db.execute(select(Module).where(Module.name == name)).scalar_one_or_none():
+        name = f"{base[:37]}-{suffix}"
+        suffix += 1
+    row = Module(
+        name=name, type=ModuleType.external_api, category=body.category,
+        config=svc.encrypt_config({"url": body.url}),
+    )
+    db.add(row)
+    db.commit()
+    audit.record(db, admin.name, "module.import", name, {"source": body.name, "url": body.url})
+    return {"id": row.id, "name": row.name, "type": row.type.value, "category": row.category,
+            "organization_id": row.organization_id, "config": svc.masked_config(row.config)}
 
 
 @router.get("/projects/{project_id}/modules")

@@ -27,6 +27,7 @@ from ..schemas import (
     ReviewRequest,
 )
 from ..security import encrypt_value, require_admin, require_api_key
+from ..services import codemap as codemap_service
 from ..services import llm as llm_service
 from ..services import modules as modules_service
 from ..services import workspace
@@ -119,14 +120,21 @@ async def post_message(
 
     messages: list[dict] = [{"role": "system", "content": llm_service.EDIT_SYSTEM_PROMPT}]
 
-    # 프로젝트 컨텍스트: 바인딩된 모듈 규약 + 파일 트리 + 요청 파일 내용
+    # 프로젝트 컨텍스트: 바인딩된 모듈 규약 + 코드 구조 개요 + 요청 파일 내용
     module_ctx = modules_service.context_for_llm(db, project)
     workdir = workspace.workdir_for(project)
     context_parts = [f"Project: {project.name} (type={project.type.value})"]
     if module_ctx:
         context_parts.append("Bound modules (use these env vars):\n" + json.dumps(module_ctx))
     if workdir.exists():
-        context_parts.append("Files:\n" + "\n".join(workspace.file_tree(workdir)))
+        # 전체 파일 목록 대신 구조 개요(클래스/함수 시그니처+요약)를 준다 — 사용자의
+        # 요청을 전체 구조와 항목별 기능을 참조해 대응하도록(요청 2). 개요 추출이
+        # 실패해도(파싱 불가 등) 채팅 자체는 막지 않는다.
+        try:
+            outline = codemap_service.render_outline(codemap_service.build_code_map(workdir))
+        except Exception:  # noqa: BLE001
+            outline = "\n".join(workspace.file_tree(workdir))
+        context_parts.append("Code structure (outline):\n" + outline)
         for path, content in workspace.read_context_files(workdir, body.files).items():
             context_parts.append(f"--- {path} ---\n{content}")
     messages.append({"role": "system", "content": "\n\n".join(context_parts)})
@@ -239,6 +247,24 @@ def project_file_content(
     except ValueError as e:
         raise HTTPException(status_code=413, detail=str(e))
     return {"path": path, "content": content}
+
+
+@router.get("/projects/{project_id}/codemap")
+def project_codemap(
+    project_id: int,
+    db: Session = Depends(get_db),
+    _: ApiKey = Depends(require_api_key),
+):
+    """코드 구조 트리 — 파일→클래스/함수 계층 + 항목별 요약(정적 파싱). 확대/축소
+    시각화(코드 채팅)용이며, 같은 개요가 채팅 LLM 컨텍스트에도 주입된다."""
+    project = db.get(Project, project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="project not found")
+    try:
+        workdir, _sha = checkout(project)
+    except BuildError as e:
+        raise HTTPException(status_code=502, detail=str(e)[:1000])
+    return {"files": codemap_service.build_code_map(workdir)}
 
 
 @router.post("/projects/{project_id}/review")

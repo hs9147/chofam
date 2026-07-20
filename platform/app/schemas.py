@@ -169,6 +169,17 @@ class ModuleBind(BaseModel):
     env_prefix: str = Field(pattern=r"^[A-Z][A-Z0-9_]{0,24}$")
 
 
+class ApiModuleImport(BaseModel):
+    """외부 API 디렉터리 검색 결과를 external_api 모듈로 추가할 때의 폼.
+
+    name은 검색 결과 id(예: googleapis.com:calendar)를 그대로 받아 서버에서
+    모듈명 규약으로 정규화한다(services/apisearch.normalize_module_name)."""
+
+    name: str
+    url: str
+    category: str | None = None
+
+
 class PreviewCreate(BaseModel):
     branch: str | None = None
     ttl_minutes: int = Field(default=60, ge=5, le=480)

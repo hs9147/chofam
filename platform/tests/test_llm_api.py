@@ -142,6 +142,44 @@ def test_chat_without_diff_makes_no_change(monkeypatch):
     assert body["proposed_change_id"] is None
 
 
+def test_chat_context_includes_code_structure_outline(monkeypatch, tmp_path):
+    """요청 2 — 채팅 시 전체 구조 개요(클래스/함수 시그니처+요약)가 LLM 컨텍스트에 주입된다."""
+    import subprocess
+
+    from app.api import llm as llm_api
+
+    repo = tmp_path / "ws"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q", "-b", "main", str(repo)], check=True)
+    (repo / "svc.py").write_text('"""결제 서비스."""\ndef charge(amount):\n    return amount\n')
+    subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
+    subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t",
+                    "commit", "-q", "-m", "init"], cwd=repo, check=True)
+
+    captured: dict = {}
+
+    def fake_post(url, headers, payload):
+        captured["messages"] = payload["messages"]
+        return {"choices": [{"message": {"content": "확인했습니다."}}]}
+
+    monkeypatch.setattr(llm_service, "_post_chat", fake_post)
+    monkeypatch.setattr(llm_api.workspace, "workdir_for", lambda project: repo)
+
+    c = _client()
+    pid = _create_project(c)
+    prov = _create_provider(c)
+    sid = c.post("/paas/api/v1/chat/sessions", json={"project_id": pid, "provider_id": prov},
+                 headers=ADMIN).json()["id"]
+    c.post(f"/paas/api/v1/chat/sessions/{sid}/messages",
+           json={"content": "charge 함수 설명해줘"}, headers=ADMIN)
+
+    system_text = "\n".join(m["content"] for m in captured["messages"] if m["role"] == "system")
+    assert "Code structure (outline)" in system_text
+    assert "svc.py" in system_text
+    assert "def charge(amount)" in system_text
+    assert "결제 서비스." in system_text
+
+
 def test_review_endpoint_with_explicit_diff(monkeypatch):
     monkeypatch.setattr(
         llm_service, "_post_chat",

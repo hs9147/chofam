@@ -3,8 +3,9 @@ import Async from '../components/Async';
 import Modal from '../components/Modal';
 import StatusPill from '../components/StatusPill';
 import { api } from '../lib/api';
+import { isAdmin } from '../lib/auth';
 import { useApi } from '../lib/hooks';
-import type { OrgOut } from '../lib/types';
+import type { ApiSearchResult, OrgOut } from '../lib/types';
 
 const TYPE_HINTS: Record<string, string> = {
   external_api: '{"url": "https://...", "api_key": "..."}',
@@ -16,12 +17,18 @@ const TYPE_HINTS: Record<string, string> = {
 export default function Modules() {
   const state = useApi(() => api.listModules());
   const [showCreate, setShowCreate] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
 
   return (
     <div className="panel">
       <div className="row" style={{ marginBottom: 12 }}>
         <h2 style={{ margin: 0 }}>모듈 레지스트리</h2>
         <div className="spacer" />
+        {isAdmin() && (
+          <button className="secondary" onClick={() => setShowSearch(true)}>
+            외부 API 검색
+          </button>
+        )}
         <button onClick={() => setShowCreate(true)}>+ 새 모듈</button>
       </div>
       <p className="mutedtext" style={{ fontSize: 12 }}>
@@ -64,7 +71,106 @@ export default function Modules() {
           }}
         />
       )}
+      {showSearch && (
+        <SearchApiModal
+          onClose={() => setShowSearch(false)}
+          onAdded={() => state.reload()}
+        />
+      )}
     </div>
+  );
+}
+
+function SearchApiModal({ onClose, onAdded }: { onClose: () => void; onAdded: () => void }) {
+  const [keyword, setKeyword] = useState('');
+  const [results, setResults] = useState<ApiSearchResult[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [added, setAdded] = useState<Record<string, string>>({});
+
+  const search = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!keyword.trim()) return;
+    setBusy(true);
+    setError('');
+    try {
+      const res = await api.searchApis(keyword.trim());
+      setResults(res.results);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const add = async (r: ApiSearchResult) => {
+    setError('');
+    try {
+      const url = r.spec_url || r.homepage;
+      const created = await api.importApiModule(r.id, url, r.categories[0]);
+      setAdded((a) => ({ ...a, [r.id]: created.name }));
+      onAdded();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  };
+
+  return (
+    <Modal title="외부 API 검색 → 모듈 추가" onClose={onClose}>
+      <p className="mutedtext" style={{ fontSize: 12, marginTop: 0 }}>
+        공개 API 디렉터리를 키워드로 검색해 external_api 모듈로 추가합니다. 추가 후
+        설정의 <span className="mono">url</span>·<span className="mono">api_key</span>는 새 모듈
+        수정에서 채웁니다.
+      </p>
+      <form onSubmit={search} className="row" style={{ marginBottom: 12 }}>
+        <input
+          value={keyword}
+          onChange={(e) => setKeyword(e.target.value)}
+          placeholder="예: payment, weather, calendar"
+          style={{ flex: 1 }}
+        />
+        <button type="submit" disabled={busy || !keyword.trim()}>
+          {busy ? '검색 중...' : '검색'}
+        </button>
+      </form>
+      {error && <p className="error">{error}</p>}
+      {results && results.length === 0 && (
+        <p className="mutedtext">검색 결과가 없습니다.</p>
+      )}
+      {results && results.length > 0 && (
+        <table>
+          <thead>
+            <tr>
+              <th>API</th>
+              <th>카테고리</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {results.map((r) => (
+              <tr key={r.id}>
+                <td>
+                  <div>{r.title}</div>
+                  <div className="mutedtext" style={{ fontSize: 12 }}>
+                    {r.description || r.provider}
+                  </div>
+                </td>
+                <td className="mutedtext" style={{ fontSize: 12 }}>
+                  {r.categories.join(', ') || '—'}
+                </td>
+                <td>
+                  {added[r.id] ? (
+                    <span className="status ok">추가됨: {added[r.id]}</span>
+                  ) : (
+                    <button className="small" onClick={() => add(r)}>추가</button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </Modal>
   );
 }
 
