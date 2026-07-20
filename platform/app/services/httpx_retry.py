@@ -79,12 +79,21 @@ def _record_success(host: str) -> None:
 
 
 def post_with_retry(url: str, **kwargs) -> httpx.Response:
+    return _request_with_retry(httpx.post, url, **kwargs)
+
+
+def get_with_retry(url: str, **kwargs) -> httpx.Response:
+    """GET은 멱등이라 재시도가 안전하다(외부 API 디렉터리 조회 등 읽기 전용 호출용)."""
+    return _request_with_retry(httpx.get, url, **kwargs)
+
+
+def _request_with_retry(fn, url: str, **kwargs) -> httpx.Response:
     host = urlparse(url).netloc or url
     _check_open(host)
     last: Exception | None = None
     for attempt in range(MAX_ATTEMPTS):
         try:
-            res = httpx.post(url, **kwargs)
+            res = fn(url, **kwargs)
             _record_success(host)
             return res
         except RETRYABLE as e:

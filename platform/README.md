@@ -122,6 +122,7 @@ POST /paas/api/v1/projects/upload          # multipart: zip_file 또는 files[](
                                       #   deploy_after_upload=true면 push 직후 배포 큐에 등록(원클릭)
 GET  /paas/api/v1/projects/{id}/files      # 읽기 전용 파일 트리 (workspace 기능)
 GET  /paas/api/v1/projects/{id}/files/content?path=  # 읽기 전용 파일 내용 — 수정 엔드포인트는 없음(채팅/diff로만)
+GET  /paas/api/v1/projects/{id}/codemap    # 코드 구조 트리(파일→클래스/함수+요약, 정적 파싱)
 POST /paas/api/v1/projects/{id}/deploy     # {profile?: development|release, git_sha?}
 POST /paas/api/v1/projects/{id}/rollback?profile=release
 POST /paas/api/v1/projects/{id}/stop?profile=development
@@ -169,8 +170,8 @@ curl -X POST "$BASE/projects/1/rollback?profile=release" -H "x-api-key: $ADMIN"
 POST /paas/api/v1/llm/providers                     # 외부(Claude/OpenAI) 또는 내부(project://<llm 프로젝트>) 등록 (admin)
 GET  /paas/api/v1/llm/providers                     # api_key는 has_api_key로만 노출
 POST /paas/api/v1/chat/sessions                     # {project_id, provider_id, branch?} — 기본 브랜치 paas/chat-{id}
-POST /paas/api/v1/chat/sessions/{id}/messages       # 파일 트리·모듈 규약·요청 파일을 컨텍스트로 LLM 호출
-                                                # 응답에 diff가 있으면 ProposedChange 자동 생성
+POST /paas/api/v1/chat/sessions/{id}/messages       # 코드 구조 개요·모듈 규약·요청 파일을 컨텍스트로 LLM 호출
+                                                # (전체 구조·항목별 요약을 참조해 대응) 응답 diff는 ProposedChange 자동 생성
 POST /paas/api/v1/changes/{id}/apply                # 승인 → 작업 브랜치에 git apply + commit (LLM 직접 쓰기 없음)
 POST /paas/api/v1/changes/{id}/reject
 POST /paas/api/v1/projects/{id}/review              # {provider_id, diff? , base_ref?} → 심각도 분류 findings
@@ -179,6 +180,8 @@ POST /paas/api/v1/modules                           # external_api | internal_ap
                                                 #   + category?(예: news, llm — API 카테고리별 그룹핑)
                                                 #   + organization_id?(지정 시 해당 조직 프로젝트에만 노출)
                                                 # config의 api_key/dsn/secret 등은 Fernet 암호화 저장
+GET  /paas/api/v1/modules/search?keyword=           # 외부 API 디렉터리 키워드 검색 (admin, 아웃바운드 조회)
+POST /paas/api/v1/modules/import                    # 검색 결과를 external_api 모듈로 자동 추가 (admin, 이름 정규화)
 POST /paas/api/v1/projects/{id}/modules/{mid}/bind  # {env_prefix: "PAY"} → 배포 시 PAY_URL 등 자동 주입
 GET  /paas/api/v1/projects/{id}/modules             # LLM 컨텍스트용 요약 (비밀값 제외, 바인딩된 모듈만)
 GET  /paas/api/v1/projects/{id}/resources           # 대화식 편집 화면 자원 리스팅 — 바인딩 여부와 무관하게
@@ -193,6 +196,14 @@ DELETE /paas/api/v1/previews/{id}
 - internal_api 모듈의 URL은 티어에 따라 자동 해석됩니다
   (small: `https://{target}.{base_domain}`, enterprise: `http://paas-{target}.{ns}.svc`).
 - 프리뷰는 development 프로필 빌드를 재사용하되 CPU 50%·GPU 금지·동시 5개 제한·TTL 회수가 걸립니다.
+- **코드 구조 시각화**: 콘솔 "채팅" 화면에서 프로젝트를 고르면 정적 파싱(Python `ast`,
+  JS/TS 정규식)으로 만든 파일→클래스/함수 계층 트리를 확대/축소로 확인할 수 있고,
+  **같은 개요가 채팅 LLM 컨텍스트에도 주입**되어 전체 구조·항목별 기능 요약을 참조해
+  요청에 대응합니다(`services/codemap.py`, `GET /projects/{id}/codemap`).
+- **외부 API 검색 → 모듈 자동 추가**: 모듈 레지스트리에서 키워드로 공개 API 디렉터리
+  (기본 apis.guru, `PAAS_API_DIRECTORY_URL`로 사내 미러 교체 가능)를 검색해 선택 결과를
+  external_api 모듈로 바로 추가합니다(admin 전용 — 아웃바운드 메타데이터 조회이므로).
+  이름은 모듈 규약으로 자동 정규화(`services/apisearch.py`).
 
 ## 콘솔 UI (`console/`)
 
@@ -213,9 +224,10 @@ npm run build        # tsc 타입체크 + vite build → dist/
 - 화면: 시스템 대시보드(CPU/메모리/디스크/GPU 게이지, 키 발급), 프로젝트(생성 시 git_url 직접
   입력/조직 소속 자동 생성/zip·폴더 업로드 3가지 방식 선택, dev/release 배포·롤백·중지·배포
   이력·로그 3초 폴링·환경변수·모듈 바인딩·프리뷰), 코드 확인(읽기 전용 파일 트리·내용 뷰어 —
-  수정은 채팅 탭에서 diff로만), 모듈 레지스트리(카테고리·조직 범위 표시), LLM 프로바이더,
+  수정은 채팅 탭에서 diff로만), 모듈 레지스트리(카테고리·조직 범위 표시 + admin은 "외부 API
+  검색"으로 공개 디렉터리에서 external_api 자동 추가), LLM 프로바이더,
   대화식 코드 편집(diff 뷰 + 승인/거절 + 브랜치 리뷰 + 프로젝트 선택 시 카테고리별 사용 가능
-  자원 패널: API 카테고리·서버내 공유 파일·조직별 DB 아이템 리스팅), 서버구성(런타임/
+  자원 패널 + 코드 구조 트리 확대/축소), 서버구성(런타임/
   프록시 백엔드 표시, 프로젝트×프로필별 도메인·상태·배포/중지, 리다이렉트/재작성 규칙
   관리), 감사 로그
 - 인증은 `x-api-key`를 sessionStorage에 보관(기존 admin/mail 관례). 로그인 검증은 admin 전용

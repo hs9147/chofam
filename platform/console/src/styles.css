@@ -192,6 +192,17 @@ pre.logbox {
 .diffview .hunk { color: var(--accent); background: rgba(74, 108, 247, 0.08); }
 .diffview .meta { color: var(--muted); }
 
+/* 코드 구조 트리 (확대/축소) */
+.codemap { display: flex; flex-direction: column; gap: 2px; }
+.codemap details { border-left: 1px solid var(--border-soft); }
+.codemap summary {
+  cursor: pointer; padding: 3px 6px; border-radius: 4px; list-style-position: inside;
+}
+.codemap summary:hover { background: rgba(255, 255, 255, 0.04); }
+.codemap .codemap-children { padding-left: 16px; }
+.codemap .codemap-leaf { padding: 3px 6px 3px 22px; }
+.codemap-file > summary { font-weight: 700; }
+
 /* 서버구성 토폴로지 다이어그램 */
 .topo-wrap { overflow-x: auto; margin-top: 10px; }
 .topo-edge { fill: none; stroke: var(--border); stroke-width: 1.5; }

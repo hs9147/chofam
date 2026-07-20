@@ -1,8 +1,10 @@
 import { getKey, logout } from './auth';
 import type {
   ApiKeyIssued,
+  ApiSearchResult,
   AuditRow,
   BuildProfile,
+  CodeMapOut,
   HealthInfo,
   PaymentOut,
   ChatReply,
@@ -210,9 +212,16 @@ export const api = {
   projectFiles: (id: number) => request<ProjectFilesOut>('GET', `/projects/${id}/files`),
   projectFileContent: (id: number, path: string) =>
     request<ProjectFileContentOut>('GET', `/projects/${id}/files/content`, undefined, { path }),
+  // 코드 구조 트리 (정적 파싱 — 확대/축소 시각화 + 채팅 LLM 컨텍스트와 동일 소스)
+  projectCodemap: (id: number) => request<CodeMapOut>('GET', `/projects/${id}/codemap`),
 
   // 모듈
   listModules: () => request<ModuleOut[]>('GET', '/modules'),
+  // 외부 API 디렉터리 검색 + external_api 모듈 자동 추가 (admin)
+  searchApis: (keyword: string) =>
+    request<{ results: ApiSearchResult[] }>('GET', '/modules/search', undefined, { keyword }),
+  importApiModule: (name: string, url: string, category?: string) =>
+    request<ModuleOut>('POST', '/modules/import', { name, url, category: category || null }),
   createModule: (
     name: string,
     type: string,

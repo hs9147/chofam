@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import Async from '../components/Async';
+import CodeStructure from '../components/CodeStructure';
 import DiffView from '../components/DiffView';
 import StatusPill from '../components/StatusPill';
 import { api } from '../lib/api';
@@ -40,6 +41,14 @@ export default function Chat() {
   const resourcesState = useApi(
     () => (projectId ? api.projectResources(Number(projectId)) : Promise.resolve([])),
     [projectId],
+  );
+  const [showStructure, setShowStructure] = useState(false);
+  const codemapState = useApi(
+    () =>
+      projectId && showStructure
+        ? api.projectCodemap(Number(projectId)).then((r) => r.files)
+        : Promise.resolve([]),
+    [projectId, showStructure],
   );
   const [providerId, setProviderId] = useState('');
   const [branch, setBranch] = useState('');
@@ -232,6 +241,28 @@ export default function Chat() {
               );
             }}
           </Async>
+        </div>
+      )}
+
+      {projectId && (
+        <div className="panel">
+          <div className="row" style={{ marginBottom: 10 }}>
+            <h2 style={{ margin: 0 }}>코드 구조</h2>
+            <div className="spacer" />
+            <button className="small secondary" onClick={() => setShowStructure((v) => !v)}>
+              {showStructure ? '접기' : '구조 보기'}
+            </button>
+          </div>
+          {!showStructure ? (
+            <p className="mutedtext" style={{ fontSize: 12, margin: 0 }}>
+              파일→클래스/함수 계층을 정적 파싱으로 보여줍니다(확대/축소). 같은 개요가
+              채팅 LLM 컨텍스트에도 주입되어, 전체 구조를 참조해 요청에 대응합니다.
+            </p>
+          ) : (
+            <Async state={codemapState} empty="파싱 가능한 코드 파일이 없습니다.">
+              {(files) => <CodeStructure files={files} />}
+            </Async>
+          )}
         </div>
       )}
 
