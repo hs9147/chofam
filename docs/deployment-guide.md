@@ -160,6 +160,41 @@ cd /opt/paas/platform/console && npm install && npm run build
 # 이후 https://paas.example.com/console/ 접속
 ```
 
+### 3.2b Docker Compose로 설치 (옵션)
+
+3.2절의 pip/venv 방식 대신, 백엔드+콘솔을 이미지 하나로 묶어 `docker compose up`
+한 줄로 기동할 수 있다(`platform/Dockerfile`, `platform/docker-compose.yml`). 콘솔은
+빌드 스테이지에서 `npm run build`로 만들어 이미지 안 `console/dist`에 넣고,
+FastAPI가 지금과 동일하게 `/console`에 정적 마운트한다 — 서빙 방식 자체는 바뀌지 않는다.
+
+**제약 — Linux 호스트(또는 WSL2) 전용.** 이 플랫폼은 자신이 배포하는 프로젝트
+컨테이너를 `127.0.0.1:{host_port}`로 헬스체크·연결한다(`DockerRuntime`, 3.1절과 같은
+전제). 플랫폼 컨테이너를 기본 브리지 네트워크에 두면 이 `127.0.0.1`이 프로젝트
+컨테이너와 달라져 배포마다 헬스체크가 실패하므로, `docker-compose.yml`은
+`network_mode: host`로 고정돼 있다. host 네트워크 모드는 Docker Desktop
+(macOS·Windows 네이티브)에서 지원하지 않으니, 그 환경에서는 이 옵션 대신 3.2절
+(venv) 또는 3.6절(WSL2)을 사용할 것.
+
+또한 플랫폼이 직접 `docker build`/컨테이너 기동을 수행하므로(`services/build.py`,
+`services/runtime/docker_runtime.py`), 이미지 안에도 docker CLI가 들어 있고 호스트의
+`/var/run/docker.sock`을 그대로 마운트한다("docker outside of docker" — 컨테이너
+안에서 호스트 데몬을 제어). 소켓 마운트는 호스트에 대한 사실상의 root 권한과 같으므로
+신뢰된 운영자만 접근 가능한 호스트에서만 사용할 것.
+
+```bash
+# 실행 위치: /opt/paas/platform (3.1절로 Docker Engine·Caddy까지 설치된 상태)
+cp .env.example .env    # 3.2절 표의 필수 키(PAAS_ADMIN_API_KEY 등)를 채운다
+# DB 파일이 컨테이너 재생성 후에도 남도록 ./data 볼륨 안에 두도록 지정:
+echo 'PAAS_DATABASE_URL=sqlite:///./data/paas.db' >> .env
+
+docker compose up -d --build
+docker compose logs -f platform   # 기동 확인
+```
+
+콘솔은 별도 빌드 없이 이미지 빌드 시점에 이미 포함되어 있다 —
+`https://paas.example.com/console/` 접속만 하면 된다. 코드 변경 후 재배포는
+`docker compose up -d --build`로 이미지를 다시 빌드하면 된다.
+
 ### 3.3 프로젝트 등록 → 배포 → 확인 (FastAPI 앱 예시)
 
 아래는 외부 GitHub 리포를 직접 등록하는 가장 단순한 경로다 — `PAAS_GIT_INTERNAL_ONLY`
