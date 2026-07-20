@@ -106,11 +106,19 @@ def build_image(
     component_type: ProjectType | None = None,
 ) -> BuildResult:
     """component가 주어지면(composite 전용) workdir/{component}를 별도 빌드 컨텍스트로
-    쓰고, 태그·로그 파일명에 컴포넌트명을 붙여 일반 프로젝트와 충돌하지 않게 한다."""
+    쓰고, 태그·로그 파일명에 컴포넌트명을 붙여 일반 프로젝트와 충돌하지 않게 한다.
+
+    component가 없고 project.source_subdir가 지정된 경우(모노레포 서브폴더 프로젝트)는
+    workdir/{source_subdir}를 빌드 컨텍스트로 쓴다 — 태그·포트 매핑은 일반 프로젝트와 동일."""
     settings = get_settings()
     spec = PROFILES[profile]
     build_type = component_type or project.type
-    context_dir = workdir / component if component else workdir
+    if component:
+        context_dir = workdir / component
+    elif project.source_subdir:
+        context_dir = workdir / project.source_subdir
+    else:
+        context_dir = workdir
     tag = spec.image_tag(project.name, git_sha, component=component)
     dockerfile = dockerfile_for(build_type, profile, context_dir)
 

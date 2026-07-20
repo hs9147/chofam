@@ -24,6 +24,8 @@ class ProjectCreate(BaseModel):
     organization_id: int | None = None
     git_url: str | None = None
     branch: str = "main"
+    # 모노레포에서 리포 루트가 아닌 서브디렉터리를 빌드 컨텍스트로 쓸 때 지정 (예: "platform/console")
+    source_subdir: str | None = None
     domain: str | None = None
     health_check_path: str = "/"
     memory_limit: str | None = None
@@ -68,6 +70,7 @@ class ProjectOut(BaseModel):
     # 비관리자 응답에서는 마스킹된다 (api/projects.py `_serialize_project`)
     git_url: str
     branch: str
+    source_subdir: str | None
     domain: str | None
     default_profile: BuildProfile
     created_at: datetime

@@ -96,6 +96,28 @@ uvicorn app.main:app --port 7000
 
 Caddy는 메인 Caddyfile에 `import ./data/caddy-sites/*.caddy` 한 줄만 추가하면 됩니다.
 
+### Docker Compose로 실행 (옵션)
+
+백엔드+콘솔을 이미지 하나로 묶어 `docker compose up`으로 기동할 수도 있습니다
+(`Dockerfile`, `docker-compose.yml`). Linux 호스트(또는 WSL2) 전용 — 배포된 프로젝트
+컨테이너와의 `127.0.0.1` 헬스체크 전제 때문에 `network_mode: host`가 필요하고, 이는
+Docker Desktop(macOS/Windows 네이티브)에서 지원되지 않습니다. 호스트 Docker 데몬으로
+프로젝트를 빌드·기동하기 위해 `/var/run/docker.sock`도 마운트합니다("docker outside of
+docker"). 상세 설정은 [docs/deployment-guide.md §3.2b](../docs/deployment-guide.md#32b-docker-compose로-설치-옵션) 참고.
+
+```bash
+cp .env.example .env
+docker compose up -d --build
+```
+
+### 콘솔 자기 배포 (옵트인)
+
+`PAAS_SELF_DEPLOY_CONSOLE=true`면 위 정적 마운트 대신, 백엔드가 기동할 때 콘솔을
+`paas-console`이라는 일반 `react` Project(`source_subdir=platform/console`)로 등록해
+플랫폼 자신의 배포 파이프라인(build_image → DockerRuntime → 리버스프록시)으로
+띄웁니다 — `services/self_deploy.py`. 최초 1회만 자동 배포하며, 상세 설정은
+[docs/deployment-guide.md §3.2c](../docs/deployment-guide.md#32c-콘솔을-배포-파이프라인으로-자기-배포-옵트인) 참고.
+
 ## API 요약 (인증: `x-api-key` 헤더)
 
 모든 엔드포인트는 `/paas` 아래 마운트된다(여러 내부 서비스가 게이트웨이를 공유할 때

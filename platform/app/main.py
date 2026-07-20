@@ -52,6 +52,10 @@ def create_app() -> FastAPI:
         app.include_router(webhooks.router, prefix=PAAS_PREFIX)  # /paas/webhooks/git — 버전 없음
         app.include_router(previews.router, prefix=API_PREFIX)
         app.include_router(server.router, prefix=API_PREFIX)
+        # 콘솔 자기 배포(옵트인, PAAS_SELF_DEPLOY_CONSOLE) — services/self_deploy.py 참고
+        from .services.self_deploy import bootstrap_console_deploy  # noqa: PLC0415
+
+        bootstrap_console_deploy()
     if "workspace" in features:
         app.include_router(llm.router, prefix=API_PREFIX)
     if "payment" in features:
