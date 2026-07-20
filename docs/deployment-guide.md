@@ -195,6 +195,42 @@ docker compose logs -f platform   # 기동 확인
 `https://paas.example.com/console/` 접속만 하면 된다. 코드 변경 후 재배포는
 `docker compose up -d --build`로 이미지를 다시 빌드하면 된다.
 
+### 3.2c 콘솔을 배포 파이프라인으로 자기 배포 (옵트인)
+
+3.2/3.2b절의 콘솔은 항상 `npm run build` 산출물을 FastAPI가 `/console`에 정적
+마운트하는 방식이다. `PAAS_SELF_DEPLOY_CONSOLE=true`를 켜면, 백엔드가 기동할 때
+**자기 자신의 콘솔을 플랫폼의 일반 배포 기능으로** 띄운다 — 콘솔을 `paas-console`
+이라는 이름의 보통 `react` 타입 Project로 등록하고, 3.3절과 동일한 배포 파이프라인
+(build_image → DockerRuntime 컨테이너 → 리버스프록시)으로 첫 배포를 트리거한다.
+콘솔은 이제 정적 마운트가 아니라 자기 도메인(`paas-console.{base_domain}`)을 가진
+별도 컨테이너로 서빙된다.
+
+콘솔은 이 리포(`chofam`) 안 `platform/console/` 서브폴더에 있어 리포 루트만으로는
+빌드 컨텍스트를 찾을 수 없다 — 그래서 `Project.source_subdir`(모노레포 서브폴더
+빌드 컨텍스트 필드, 어떤 프로젝트에나 범용으로 쓸 수 있다)를 `platform/console`로
+설정해 등록한다. `platform/console/Dockerfile`은 이 자기 배포 전용으로 이미
+리포에 포함돼 있다(일반 `react.release.Dockerfile` 템플릿과 달리 `vite build
+--base=/`로 빌드한다 — 콘솔이 `/console` 경로가 아니라 자기 도메인 루트에서
+서빙되기 때문).
+
+```bash
+# .env에 추가
+PAAS_SELF_DEPLOY_CONSOLE=true
+PAAS_SELF_DEPLOY_CONSOLE_GIT_URL=https://git.internal.example.com/org/chofam   # 이 플랫폼 자신의 git 리포
+PAAS_SELF_DEPLOY_CONSOLE_BRANCH=main
+```
+
+**주의할 점**
+
+- **옵트인 기본값 false.** Docker 데몬 접근이 필요하고, 최초 배포가 끝나기 전까지는
+  콘솔에 접근할 수 없는 시간이 생긴다(기존 정적 마운트는 이 공백이 없다).
+- `PAAS_GIT_INTERNAL_ONLY=true`(기본값)에서는 `PAAS_SELF_DEPLOY_CONSOLE_GIT_URL`도
+  `PAAS_GITEA_URL` 호스트와 일치해야 한다 — 안 맞으면 자기 배포는 조용히 건너뛰고
+  (앱 기동 자체는 막지 않음) 경고 로그만 남긴다.
+- **최초 1회만** 자동 배포한다. 이미 배포 이력이 있으면 재기동해도 다시 빌드하지
+  않는다 — 콘솔 업데이트는 기존 프로젝트처럼 `POST /projects/{id}/deploy` 호출이나
+  웹훅으로 한다(3.4절).
+
 ### 3.3 프로젝트 등록 → 배포 → 확인 (FastAPI 앱 예시)
 
 아래는 외부 GitHub 리포를 직접 등록하는 가장 단순한 경로다 — `PAAS_GIT_INTERNAL_ONLY`

@@ -151,6 +151,15 @@ class Settings(BaseSettings):
     # OpenAPI 디렉터리. 기본은 apis.guru 공개 목록. 폐쇄망이라면 사내 미러 URL로 교체.
     api_directory_url: str = "https://api.apis.guru/v2/list.json"
 
+    # --- 콘솔 자기 배포 (옵트인, services/self_deploy.py) ---
+    # true면 백엔드 기동 시 platform/console/을 일반 react Project(source_subdir 사용)로
+    # 등록하고 기존 배포 파이프라인(build_image → DockerRuntime → 리버스프록시)으로 최초
+    # 1회 배포한다. 기본 꺼짐 — 꺼져 있으면 지금처럼 콘솔은 /console에 정적 마운트된다.
+    # Docker 데몬 접근과 최초 배포 시간(그동안 콘솔 접근 불가)이 필요해 기본값을 false로 둔다.
+    self_deploy_console: bool = False
+    self_deploy_console_git_url: str = ""  # 이 플랫폼 자신의 git 리포 URL
+    self_deploy_console_branch: str = "main"
+
 
 @lru_cache
 def get_settings() -> Settings:

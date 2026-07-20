@@ -3,8 +3,9 @@ from pathlib import Path
 
 import pytest
 
-from app.models import BuildProfile, ProjectType
-from app.services.build import PROFILES, TEMPLATE_DIR, dockerfile_for, internal_port
+from app.models import BuildProfile, Project, ProjectType
+from app.services import build as build_service
+from app.services.build import PROFILES, TEMPLATE_DIR, build_image, dockerfile_for, internal_port
 
 
 def test_image_tag_suffix():
@@ -64,6 +65,32 @@ def test_html_serves_static_files_port_80():
     for profile in ("development", "release"):
         content = (TEMPLATE_DIR / f"html.{profile}.Dockerfile").read_text(encoding="utf-8")
         assert "caddy" in content and "file-server" in content
+
+
+def test_build_image_uses_source_subdir_as_context(monkeypatch, tmp_path):
+    """모노레포 서브폴더 프로젝트(예: 콘솔 자기 배포)는 workdir/source_subdir를
+    빌드 컨텍스트로 써야 한다 — services/self_deploy.py가 의존하는 동작."""
+    (tmp_path / "platform" / "console").mkdir(parents=True)
+    project = Project(
+        name="paas-console", type=ProjectType.react,
+        git_url="https://git.example.com/x", source_subdir="platform/console",
+    )
+
+    captured = {}
+
+    class _FakeProc:
+        returncode = 0
+
+    def fake_run(cmd, stdout, stderr):
+        captured["cmd"] = cmd
+        return _FakeProc()
+
+    monkeypatch.setattr(build_service.subprocess, "run", fake_run)
+
+    result = build_image(project, tmp_path, "a" * 40, BuildProfile.release)
+
+    assert captured["cmd"][-1] == str(tmp_path / "platform" / "console")
+    assert result.internal_port == 80  # react release — internal_port(project.type, profile)
 
 
 def test_streamlit_runs_via_streamlit_cli_port_8501():
