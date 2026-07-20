@@ -27,7 +27,7 @@ def test_any_host_allowed_when_explicitly_disabled(monkeypatch, fresh_settings):
     monkeypatch.setenv("PAAS_GIT_INTERNAL_ONLY", "false")
     get_settings.cache_clear()
     c = TestClient(create_app())
-    r = c.post("/api/v1/projects", json={
+    r = c.post("/paas/api/v1/projects", json={
         "name": "ext-app", "type": "python", "git_url": "https://github.com/org/repo",
     }, headers=ADMIN)
     assert r.status_code == 201
@@ -35,7 +35,7 @@ def test_any_host_allowed_when_explicitly_disabled(monkeypatch, fresh_settings):
 
 def test_external_host_rejected_when_enabled(monkeypatch, fresh_settings):
     c = _client(monkeypatch)
-    r = c.post("/api/v1/projects", json={
+    r = c.post("/paas/api/v1/projects", json={
         "name": "ext-app", "type": "python", "git_url": "https://github.com/org/repo",
     }, headers=ADMIN)
     assert r.status_code == 422
@@ -44,7 +44,7 @@ def test_external_host_rejected_when_enabled(monkeypatch, fresh_settings):
 
 def test_internal_host_allowed_when_enabled(monkeypatch, fresh_settings):
     c = _client(monkeypatch)
-    r = c.post("/api/v1/projects", json={
+    r = c.post("/paas/api/v1/projects", json={
         "name": "int-app", "type": "python",
         "git_url": "https://git.example.com/org/repo",
     }, headers=ADMIN)
@@ -53,7 +53,7 @@ def test_internal_host_allowed_when_enabled(monkeypatch, fresh_settings):
 
 def test_ssh_scp_form_host_matches(monkeypatch, fresh_settings):
     c = _client(monkeypatch)
-    r = c.post("/api/v1/projects", json={
+    r = c.post("/paas/api/v1/projects", json={
         "name": "ssh-app", "type": "python",
         "git_url": "git@git.example.com:org/repo.git",
     }, headers=ADMIN)
@@ -62,7 +62,7 @@ def test_ssh_scp_form_host_matches(monkeypatch, fresh_settings):
 
 def test_ssh_scp_form_wrong_host_rejected(monkeypatch, fresh_settings):
     c = _client(monkeypatch)
-    r = c.post("/api/v1/projects", json={
+    r = c.post("/paas/api/v1/projects", json={
         "name": "ssh-bad", "type": "python", "git_url": "git@github.com:org/repo.git",
     }, headers=ADMIN)
     assert r.status_code == 422
@@ -73,7 +73,7 @@ def test_enabled_without_gitea_url_gives_clear_error(monkeypatch, fresh_settings
     monkeypatch.delenv("PAAS_GITEA_URL", raising=False)
     get_settings.cache_clear()
     c = TestClient(create_app())
-    r = c.post("/api/v1/projects", json={
+    r = c.post("/paas/api/v1/projects", json={
         "name": "misconfigured", "type": "python", "git_url": "https://git.example.com/org/repo",
     }, headers=ADMIN)
     assert r.status_code == 503

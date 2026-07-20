@@ -10,9 +10,14 @@ from .config import get_settings
 from .db import Base, engine
 from .features import enabled_features
 
-# 모든 API 엔드포인트의 공통 버전 prefix. /health, /status는 예외(system.health_router,
-# 로드밸런서/k8s probe·콘솔 로그인 프로브가 버전과 무관하게 고정 경로를 기대함).
-API_PREFIX = "/api/v1"
+# 모든 엔드포인트(health/status 포함)를 이 서비스 이름 아래 묶는 공통 prefix —
+# 여러 내부 서비스가 같은 게이트웨이/도메인을 공유할 때 경로로 구분하기 위함.
+PAAS_PREFIX = "/paas"
+# 버전 prefix. health/status는 PAAS_PREFIX만 받고 버전은 안 받는다(로드밸런서/k8s probe·
+# 콘솔 로그인 프로브가 버전과 무관하게 고정 경로를 기대함) — system.health_router 참고.
+# webhooks도 버전을 안 받는다: 외부(Gitea/GitHub)가 한 번 등록해두는 콜백 URL이라
+# API 버전이 올라가도 안 깨지는 게 안전 — services/gitea.py의 ensure_webhook과 맞출 것.
+API_PREFIX = f"{PAAS_PREFIX}/api/v1"
 
 
 def create_app() -> FastAPI:
@@ -36,7 +41,7 @@ def create_app() -> FastAPI:
     features = enabled_features()
 
     # core — 항상 켜짐 (projects 안의 배포 계열 엔드포인트는 require_feature("deploy")로 게이트)
-    app.include_router(system.health_router)  # /health, /status — prefix 없음
+    app.include_router(system.health_router, prefix=PAAS_PREFIX)  # /paas/health, /paas/status
     app.include_router(system.router, prefix=API_PREFIX)
     app.include_router(projects.router, prefix=API_PREFIX)
     app.include_router(orgs.router, prefix=API_PREFIX)
@@ -44,7 +49,7 @@ def create_app() -> FastAPI:
 
     # 선택 모듈 (설치 빌드옵션)
     if "deploy" in features:
-        app.include_router(webhooks.router, prefix=API_PREFIX)
+        app.include_router(webhooks.router, prefix=PAAS_PREFIX)  # /paas/webhooks/git — 버전 없음
         app.include_router(previews.router, prefix=API_PREFIX)
         app.include_router(server.router, prefix=API_PREFIX)
     if "workspace" in features:

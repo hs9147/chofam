@@ -26,13 +26,15 @@ import type {
   StatusSnapshot,
 } from './types';
 
-// 백엔드 라우터는 공통 /api/v1 prefix로 마운트된다 — /health, /status만 예외
-// (로드밸런서/k8s probe 및 로그인 프로브가 버전과 무관한 고정 경로를 기대함).
-const API_BASE = '/api/v1';
-const UNPREFIXED_PATHS = new Set(['/health', '/status']);
+// 백엔드 라우터는 모두 /paas 아래 마운트된다. /health, /status는 버전 prefix 없이
+// /paas만 받는다(로드밸런서/k8s probe 및 로그인 프로브가 버전과 무관한 고정 경로를 기대함) —
+// 나머지는 /paas/api/v1. app/main.py의 PAAS_PREFIX/API_PREFIX와 반드시 맞출 것.
+const PAAS_PREFIX = '/paas';
+const API_BASE = `${PAAS_PREFIX}/api/v1`;
+const UNVERSIONED_PATHS = new Set(['/health', '/status']);
 
 function apiUrl(path: string): string {
-  return UNPREFIXED_PATHS.has(path) ? path : `${API_BASE}${path}`;
+  return UNVERSIONED_PATHS.has(path) ? `${PAAS_PREFIX}${path}` : `${API_BASE}${path}`;
 }
 
 export class ApiError extends Error {

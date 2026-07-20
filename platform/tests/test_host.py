@@ -57,7 +57,7 @@ def test_health_exposes_host_os(monkeypatch, fresh_settings):
     from fastapi.testclient import TestClient
     from app.main import create_app
 
-    body = TestClient(create_app()).get("/health").json()
+    body = TestClient(create_app()).get("/paas/health").json()
     assert body["host_os"] == "windows"
     assert "features" in body
     assert body["gitea_url"] is None  # 미설정 시 콘솔이 메뉴를 숨길 수 있도록 null
@@ -69,5 +69,5 @@ def test_health_exposes_gitea_url_when_configured(monkeypatch, fresh_settings):
     from fastapi.testclient import TestClient
     from app.main import create_app
 
-    body = TestClient(create_app()).get("/health").json()
+    body = TestClient(create_app()).get("/paas/health").json()
     assert body["gitea_url"] == "https://git.example.com"

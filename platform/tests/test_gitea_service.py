@@ -105,7 +105,7 @@ def test_ensure_webhook_registers_when_absent(monkeypatch, fresh_settings):
     gitea.ensure_webhook("shop-team", "api")
     url, kw = posts[0]
     assert url == "https://git.example.com/api/v1/repos/shop-team/api/hooks"
-    assert kw["json"]["config"]["url"] == "https://paas.example.com/api/v1/webhooks/git"
+    assert kw["json"]["config"]["url"] == "https://paas.example.com/paas/webhooks/git"
     assert kw["json"]["config"]["secret"] == "whsecret"
 
 
@@ -116,7 +116,7 @@ def test_ensure_webhook_idempotent_when_already_registered(monkeypatch, fresh_se
     get_settings.cache_clear()
     monkeypatch.setattr(
         gitea.httpx, "get",
-        lambda url, **kw: _Res(200, [{"config": {"url": "https://paas.example.com/api/v1/webhooks/git"}}]),
+        lambda url, **kw: _Res(200, [{"config": {"url": "https://paas.example.com/paas/webhooks/git"}}]),
     )
     posted = []
     monkeypatch.setattr(gitea.httpx, "post", lambda url, **kw: posted.append(1))
