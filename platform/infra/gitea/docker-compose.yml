@@ -6,7 +6,7 @@
 #
 # 플랫폼과의 연결:
 #   - 프로젝트 등록 시 git_url을 이 Gitea 인스턴스 주소로 지정
-#   - 웹훅: Gitea 리포 Settings → Webhooks → Payload URL = https://<paas>/webhooks/git,
+#   - 웹훅: Gitea 리포 Settings → Webhooks → Payload URL = https://<paas>/api/v1/webhooks/git,
 #     Secret = PAAS_WEBHOOK_SECRET과 동일 값 (플랫폼이 X-Gitea-Signature를 자동 인식)
 
 services:

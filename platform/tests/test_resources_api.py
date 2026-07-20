@@ -12,7 +12,7 @@ def _client() -> TestClient:
 
 def test_module_create_accepts_category_and_org(fresh_settings):
     c = _client()
-    r = c.post("/modules", json={
+    r = c.post("/api/v1/modules", json={
         "name": "news-api", "type": "external_api", "category": "news",
         "config": {"url": "https://news.example.com"},
     }, headers=ADMIN)
@@ -23,7 +23,7 @@ def test_module_create_accepts_category_and_org(fresh_settings):
 
 def test_module_create_rejects_unknown_org(fresh_settings):
     c = _client()
-    r = c.post("/modules", json={
+    r = c.post("/api/v1/modules", json={
         "name": "shop-db", "type": "database", "organization_id": 999, "config": {},
     }, headers=ADMIN)
     assert r.status_code == 404
@@ -41,30 +41,30 @@ def test_project_resources_filters_by_organization(monkeypatch, fresh_settings):
                   "json": lambda self=None: {"clone_url": "https://git.example.com/shop-team/api.git"}}
     )())
     c = _client()
-    org_id = c.post("/orgs", json={"name": "shop-team"}, headers=ADMIN).json()["id"]
+    org_id = c.post("/api/v1/orgs", json={"name": "shop-team"}, headers=ADMIN).json()["id"]
 
-    c.post("/modules", json={
+    c.post("/api/v1/modules", json={
         "name": "news-api", "type": "external_api", "category": "news", "config": {},
     }, headers=ADMIN)
-    c.post("/modules", json={
+    c.post("/api/v1/modules", json={
         "name": "shop-db", "type": "database", "organization_id": org_id,
         "category": None, "config": {},
     }, headers=ADMIN)
 
-    shop_pid = c.post("/projects", json={
+    shop_pid = c.post("/api/v1/projects", json={
         "name": "shop-web", "type": "react", "organization_id": org_id,
     }, headers=ADMIN).json()["id"]
-    other_pid = c.post("/projects", json={
+    other_pid = c.post("/api/v1/projects", json={
         "name": "other-app", "type": "python", "git_url": "https://git.example.com/y",
     }, headers=ADMIN).json()["id"]
 
-    shop_resources = {r["name"] for r in c.get(f"/projects/{shop_pid}/resources", headers=ADMIN).json()}
+    shop_resources = {r["name"] for r in c.get(f"/api/v1/projects/{shop_pid}/resources", headers=ADMIN).json()}
     assert shop_resources == {"news-api", "shop-db"}
 
-    other_resources = {r["name"] for r in c.get(f"/projects/{other_pid}/resources", headers=ADMIN).json()}
+    other_resources = {r["name"] for r in c.get(f"/api/v1/projects/{other_pid}/resources", headers=ADMIN).json()}
     assert other_resources == {"news-api"}
 
 
 def test_project_resources_unknown_project_404(fresh_settings):
     c = _client()
-    assert c.get("/projects/999999/resources", headers=ADMIN).status_code == 404
+    assert c.get("/api/v1/projects/999999/resources", headers=ADMIN).status_code == 404

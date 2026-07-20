@@ -26,6 +26,15 @@ import type {
   StatusSnapshot,
 } from './types';
 
+// 백엔드 라우터는 공통 /api/v1 prefix로 마운트된다 — /health, /status만 예외
+// (로드밸런서/k8s probe 및 로그인 프로브가 버전과 무관한 고정 경로를 기대함).
+const API_BASE = '/api/v1';
+const UNPREFIXED_PATHS = new Set(['/health', '/status']);
+
+function apiUrl(path: string): string {
+  return UNPREFIXED_PATHS.has(path) ? path : `${API_BASE}${path}`;
+}
+
 export class ApiError extends Error {
   status: number;
   constructor(status: number, detail: string) {
@@ -62,7 +71,7 @@ async function request<T>(
   body?: unknown,
   query?: Record<string, string | number | undefined>,
 ): Promise<T> {
-  let url = path;
+  let url = apiUrl(path);
   if (query) {
     const params = new URLSearchParams();
     for (const [k, v] of Object.entries(query)) {
@@ -103,7 +112,7 @@ async function request<T>(
 }
 
 async function requestMultipart<T>(path: string, formData: FormData): Promise<T> {
-  const res = await fetch(path, {
+  const res = await fetch(apiUrl(path), {
     method: 'POST',
     headers: { 'x-api-key': getKey() },
     body: formData,

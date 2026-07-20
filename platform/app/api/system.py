@@ -10,10 +10,13 @@ from ..schemas import ApiKeyCreate, ApiKeyIssued
 from ..security import hash_key, issue_key, require_admin, rotate_token
 from ..services import monitor
 
+# 헬스체크·상태 프로브는 버전 prefix 밖에 둔다(로드밸런서/k8s liveness probe, 콘솔 로그인
+# 프로브가 API 버전과 무관하게 고정된 경로를 기대함) — router.py 참고.
+health_router = APIRouter(tags=["system"])
 router = APIRouter(tags=["system"])
 
 
-@router.get("/health")
+@health_router.get("/health")
 def health():
     from ..features import enabled_features  # noqa: PLC0415
     from ..services.host import get_host_caps  # noqa: PLC0415
@@ -28,7 +31,7 @@ def health():
     }
 
 
-@router.get("/status")
+@health_router.get("/status")
 def system_status(_: ApiKey = Depends(require_admin)):
     return monitor.snapshot()
 

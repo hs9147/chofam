@@ -25,8 +25,8 @@ def test_create_org_requires_admin(monkeypatch, fresh_settings):
     _configure_gitea(monkeypatch)
     _mock_org_ok(monkeypatch)
     c = TestClient(create_app())
-    member = c.post("/keys", json={"name": "m"}, headers=ADMIN).json()["key"]
-    r = c.post("/orgs", json={"name": "shop-team"}, headers={"x-api-key": member})
+    member = c.post("/api/v1/keys", json={"name": "m"}, headers=ADMIN).json()["key"]
+    r = c.post("/api/v1/orgs", json={"name": "shop-team"}, headers={"x-api-key": member})
     assert r.status_code == 403
 
 
@@ -40,13 +40,13 @@ def test_create_org_calls_gitea_and_persists(monkeypatch, fresh_settings):
         )())[1],
     )
     c = TestClient(create_app())
-    r = c.post("/orgs", json={"name": "shop-team"}, headers=ADMIN)
+    r = c.post("/api/v1/orgs", json={"name": "shop-team"}, headers=ADMIN)
     assert r.status_code == 201, r.text
     assert r.json() == {"id": 1, "name": "shop-team", "project_count": 0,
                         "created_at": r.json()["created_at"]}
     assert calls == ["https://git.example.com/api/v1/orgs"]
 
-    listing = c.get("/orgs", headers=ADMIN).json()
+    listing = c.get("/api/v1/orgs", headers=ADMIN).json()
     assert listing == [{"id": 1, "name": "shop-team", "project_count": 0,
                         "created_at": listing[0]["created_at"]}]
 
@@ -55,13 +55,13 @@ def test_create_org_duplicate_rejected(monkeypatch, fresh_settings):
     _configure_gitea(monkeypatch)
     _mock_org_ok(monkeypatch)
     c = TestClient(create_app())
-    c.post("/orgs", json={"name": "dup-team"}, headers=ADMIN)
-    r = c.post("/orgs", json={"name": "dup-team"}, headers=ADMIN)
+    c.post("/api/v1/orgs", json={"name": "dup-team"}, headers=ADMIN)
+    r = c.post("/api/v1/orgs", json={"name": "dup-team"}, headers=ADMIN)
     assert r.status_code == 409
 
 
 def test_create_org_without_gitea_configured_gives_503(fresh_settings):
     get_settings.cache_clear()
     c = TestClient(create_app())
-    r = c.post("/orgs", json={"name": "no-gitea"}, headers=ADMIN)
+    r = c.post("/api/v1/orgs", json={"name": "no-gitea"}, headers=ADMIN)
     assert r.status_code == 503

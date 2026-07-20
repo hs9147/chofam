@@ -171,9 +171,9 @@ DB를 Postgres로 교체하려면 deployment.yaml 주석의 `GITEA__database__*`
    콘솔의 "조직" 페이지(admin)에서 조직을 만들 때마다 여기 동명의 Organization이
    자동 생성되고, 조직 소속 프로젝트의 리포도 플랫폼이 대신 만든다 — 사용자는
    Gitea 화면에서 직접 리포를 만들 필요가 없다(일반 사용자에게 git_url도 노출 안 됨).
-1. **(레거시) 프로젝트 등록**: 조직을 쓰지 않는 경우 `POST /projects`의 `git_url`을
+1. **(레거시) 프로젝트 등록**: 조직을 쓰지 않는 경우 `POST /api/v1/projects`의 `git_url`을
    이 Gitea 인스턴스 주소로 직접 지정 (예: `https://git.example.com/org/shop-api`).
-   git 저장소가 아직 없다면 `POST /projects/upload`(zip 또는 폴더)로도 등록할 수 있다 —
+   git 저장소가 아직 없다면 `POST /api/v1/projects/upload`(zip 또는 폴더)로도 등록할 수 있다 —
    업로드 내용을 플랫폼이 새 리포에 최초 push한다(조직 소속 필수).
 2. **웹훅 자동 배포**:
    - **자동 등록(권장)**: 플랫폼 `.env`에 `PAAS_PLATFORM_PUBLIC_URL`(플랫폼 자신의
@@ -181,7 +181,7 @@ DB를 Postgres로 교체하려면 deployment.yaml 주석의 `GITEA__database__*`
      플랫폼이 아래 웹훅을 자동 등록한다 — 이 단계를 수동으로 할 필요가 없다.
    - **수동 등록**: `PAAS_PLATFORM_PUBLIC_URL`을 쓰지 않거나 레거시(직접 git_url 지정)
      경로라면 Gitea 리포 → Settings → Webhooks → Add Webhook에서 직접 등록:
-     - Payload URL: `https://<플랫폼>/webhooks/git`
+     - Payload URL: `https://<플랫폼>/api/v1/webhooks/git`
      - Secret: 플랫폼 `.env`의 `PAAS_WEBHOOK_SECRET`과 동일 값
      - Trigger: Push events
 3. 이후 흐름은 [deployment-guide.md 3.4절](../../../docs/deployment-guide.md)의 GitHub 웹훅

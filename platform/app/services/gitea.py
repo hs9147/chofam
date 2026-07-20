@@ -70,7 +70,7 @@ def ensure_webhook(org_name: str, repo_name: str) -> None:
     if not settings.platform_public_url:
         return
     base, headers = _base_and_headers()
-    hook_url = f"{settings.platform_public_url.rstrip('/')}/webhooks/git"
+    hook_url = f"{settings.platform_public_url.rstrip('/')}/api/v1/webhooks/git"
 
     existing = httpx.get(f"{base}/api/v1/repos/{org_name}/{repo_name}/hooks", headers=headers, timeout=15)
     if existing.status_code == 200 and any(

@@ -36,20 +36,20 @@ def test_rotate_secrets_endpoint_reencrypts_all(monkeypatch, fresh_settings):
     # 1) 구 키 시절에 EnvVar·프로바이더·모듈 시크릿 저장
     _set_keys(monkeypatch, OLD_KEY)
     c = TestClient(create_app())
-    pid = c.post("/projects", json={
+    pid = c.post("/api/v1/projects", json={
         "name": "rot-app", "type": "python", "git_url": "https://git.example.com/x",
     }, headers=ADMIN).json()["id"]
-    c.put(f"/projects/{pid}/env", json={"key": "TOKEN", "value": "old-secret"}, headers=ADMIN)
-    c.post("/llm/providers", json={
+    c.put(f"/api/v1/projects/{pid}/env", json={"key": "TOKEN", "value": "old-secret"}, headers=ADMIN)
+    c.post("/api/v1/llm/providers", json={
         "name": "p1", "kind": "external", "base_url": "https://x", "api_key": "pk", "model": "m",
     }, headers=ADMIN)
-    c.post("/modules", json={
+    c.post("/api/v1/modules", json={
         "name": "m1", "type": "external_api", "config": {"url": "https://y", "api_key": "mk"},
     }, headers=ADMIN)
 
     # 2) 키 교체(구 키는 old로) 후 재암호화 실행
     _set_keys(monkeypatch, NEW_KEY, old=OLD_KEY)
-    r = c.post("/admin/rotate-secrets", headers=ADMIN)
+    r = c.post("/api/v1/admin/rotate-secrets", headers=ADMIN)
     assert r.status_code == 200
     assert r.json()["rotated"] == 3  # env 1 + provider 1 + module 1
 
@@ -73,6 +73,6 @@ def test_rotate_secrets_endpoint_reencrypts_all(monkeypatch, fresh_settings):
 def test_rotate_requires_admin(monkeypatch, fresh_settings):
     _set_keys(monkeypatch, NEW_KEY)
     c = TestClient(create_app())
-    member = c.post("/keys", json={"name": "m"}, headers=ADMIN).json()["key"]
-    assert c.post("/admin/rotate-secrets", headers={"x-api-key": member}).status_code == 403
+    member = c.post("/api/v1/keys", json={"name": "m"}, headers=ADMIN).json()["key"]
+    assert c.post("/api/v1/admin/rotate-secrets", headers={"x-api-key": member}).status_code == 403
     monkeypatch.setattr(security, "_fernet", None)
