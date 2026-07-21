@@ -79,6 +79,15 @@ def test_start_registers_first_slot_a(env):
     assert install_calls and install_calls[0][2] == "paas-shop-a"
 
 
+def test_start_passes_host_env_for_loopback_only_binding(env):
+    """앱이 HOST를 지키면 방화벽 없이도 외부에서 직접 접근되지 않는다 — 단일 외부 포트(프록시)
+    강제의 일부(defense-in-depth, 완전한 보장은 아님 — 클래스 docstring 참고)."""
+    WindowsServiceRuntime().start(_spec())
+    set_env_calls = [c for c in env.calls if c[1] == "set" and c[3] == "AppEnvironmentExtra"]
+    assert set_env_calls
+    assert "HOST=127.0.0.1" in set_env_calls[0][4]
+
+
 def test_start_blue_green_switches_slot_and_tears_down_old(env):
     WindowsServiceRuntime().start(_spec())
     assert "paas-shop-a" in env.installed

@@ -64,7 +64,10 @@ class DockerRuntime(Runtime):
             name=f"{spec.unit_name}-{slot}",
             detach=True,
             environment=spec.env,
-            ports={f"{spec.internal_port}/tcp": host_port},
+            # 바인드 주소를 명시하지 않으면 Docker가 0.0.0.0(모든 인터페이스)에 publish해
+            # 리버스 프록시를 거치지 않고 host_port로 외부에서 바로 붙을 수 있다 — 반드시
+            # 127.0.0.1로 제한해 프록시(단일 외부 포트)만 접근하도록 강제한다.
+            ports={f"{spec.internal_port}/tcp": ("127.0.0.1", host_port)},
             mem_limit=_mem_bytes_str(spec.memory_limit, factor),
             nano_cpus=nano_cpus,
             restart_policy={"Name": "on-failure", "MaximumRetryCount": 3},
