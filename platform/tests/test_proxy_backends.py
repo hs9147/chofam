@@ -50,12 +50,12 @@ def test_domain_for_is_shared_base_domain_by_default(fresh_settings):
 
 
 def test_path_prefix_for_org_and_legacy_and_dev(fresh_settings):
-    assert proxy.path_prefix_for("acme", "shop", None, BuildProfile.release) == "/acme/shop/"
-    assert proxy.path_prefix_for("acme", "shop", None, BuildProfile.development) == "/acme/shop/dev/"
-    assert proxy.path_prefix_for(None, "shop", None, BuildProfile.release) == "/_/shop/"
+    assert proxy.path_prefix_for("acme", "shop", None, BuildProfile.release) == "/apps/acme/shop/"
+    assert proxy.path_prefix_for("acme", "shop", None, BuildProfile.development) == "/apps/acme/shop/dev/"
+    assert proxy.path_prefix_for(None, "shop", None, BuildProfile.release) == "/apps/_/shop/"
     # 커스텀 도메인 + release만 "/"(도메인 전체가 이 프로젝트 것)
     assert proxy.path_prefix_for("acme", "shop", "custom.example.com", BuildProfile.release) == "/"
-    assert proxy.path_prefix_for("acme", "shop", "custom.example.com", BuildProfile.development) == "/acme/shop/dev/"
+    assert proxy.path_prefix_for("acme", "shop", "custom.example.com", BuildProfile.development) == "/apps/acme/shop/dev/"
 
 
 def test_domain_and_path_prefix_unaffected_on_enterprise_tier(monkeypatch, fresh_settings):

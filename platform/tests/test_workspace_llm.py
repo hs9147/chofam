@@ -28,7 +28,7 @@ def test_extract_diff_unfenced():
 
 def test_resolve_internal_project_url():
     """db 없이 호출하면(조직 조회 불가) 서브패스 조직 자리가 "_"로 안전하게 떨어진다."""
-    assert llm.resolve_base_url("project://llm-main") == "http://apps.test/_/llm-main/"
+    assert llm.resolve_base_url("project://llm-main") == "http://apps.test/apps/_/llm-main/"
     assert llm.resolve_base_url("https://api.anthropic.com/") == "https://api.anthropic.com"
 
 
@@ -48,7 +48,7 @@ def test_resolve_internal_project_url_uses_target_organization():
                         organization_id=org.id, git_url="https://git.example.com/x"))
         db.commit()
 
-        assert llm.resolve_base_url("project://llm-main", db) == "http://apps.test/research/llm-main/"
+        assert llm.resolve_base_url("project://llm-main", db) == "http://apps.test/apps/research/llm-main/"
 
         db.query(Project).delete()
         db.query(Organization).delete()

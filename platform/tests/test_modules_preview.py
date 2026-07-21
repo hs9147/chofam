@@ -34,7 +34,7 @@ def test_internal_api_env_resolves_by_tier():
     (db 없이 호출하면 조직을 알 수 없으니 "_" 자리로 안전하게 떨어진다)."""
     m = _module(ModuleType.internal_api, {"target_project": "mail-api"})
     small = svc.binding_env(m, "MAIL")
-    assert small == {"MAIL_URL": "https://apps.test/_/mail-api/"}
+    assert small == {"MAIL_URL": "https://apps.test/apps/_/mail-api/"}
 
     from app.config import get_settings
     enterprise = get_settings().model_copy(
@@ -62,7 +62,7 @@ def test_internal_api_env_uses_target_projects_organization(fresh_settings):
 
         m = _module(ModuleType.internal_api, {"target_project": "mail-api"})
         env = svc.binding_env(m, "MAIL", db=db)
-        assert env == {"MAIL_URL": "https://apps.test/acme/mail-api/"}
+        assert env == {"MAIL_URL": "https://apps.test/apps/acme/mail-api/"}
 
         db.query(Project).delete()
         db.query(Organization).delete()
