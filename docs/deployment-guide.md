@@ -370,6 +370,15 @@ npm run build
 - **IIS를 리버스프록시로 쓰려면**(`PAAS_PROXY_BACKEND=iis`) 먼저 서버 역할에서
   Web Server(IIS) + **URL Rewrite 모듈**(마이크로소프트 공식 확장, IIS 기본 설치에는
   없음 — [별도 설치](https://www.iis.net/downloads/microsoft/url-rewrite) 필요)을 추가한다.
+  **URL Rewrite만으로는 부족하다** — 플랫폼이 생성하는 규칙은 외부 경로(`/apps/{조직}/
+  {프로젝트}/...`)를 `http://127.0.0.1:{내부 포트}/...` 같은 절대 URL로 rewrite하는데,
+  이렇게 다른 포트로 실제 요청을 전달(리버스 프록시)하는 기능은 URL Rewrite가 아니라
+  **ARR(Application Request Routing)**이 담당하므로 [ARR도 별도 설치](https://www.iis.net/downloads/microsoft/application-request-routing)
+  해야 한다(설치 자체는 플랫폼이 대신 해줄 수 없는 수동 단계). ARR의 프록시 기능을
+  켜는 것(`appcmd set config -section:system.webServer/proxy /enabled:True`)은
+  플랫폼이 첫 사이트 생성 시 자동으로 실행한다(`services/proxy/iis_proxy.py`의
+  `_ensure_arr_proxy_enabled`) — ARR이 설치돼 있지 않으면 이 자동 실행이 명확한
+  에러로 실패하므로 배포가 502/무응답으로 조용히 "성공"하는 대신 바로 원인을 알 수 있다.
   플랫폼이 이 모듈이 읽는 `web.config`를 실제로 생성해 두는 위치가
   `PAAS_IIS_SITES_ROOT`(기본 `./data/iis-sites` — 상대경로면 `platform/` 기준. 절대경로
   권장, 예: `C:\paas\platform\data\iis-sites`)이고, 사이트를 등록/해제할 때 부르는

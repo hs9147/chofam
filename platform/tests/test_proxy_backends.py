@@ -157,9 +157,34 @@ def test_iis_configure_dedicated_domain_writes_own_site(monkeypatch, tmp_path, f
     assert 'action type="Rewrite" url="/v2/internal"' in web_config
     assert "http://127.0.0.1:8123/{R:1}" in web_config
 
-    assert calls[0][1:3] == ["delete", "site"]
-    assert calls[1][1:3] == ["add", "site"]
-    assert any("/bindings:http/*:80:shop.example.com" in a for a in calls[1])
+    # ARR(Application Request Routing) 프록시 기능이 사이트 생성 전에 켜져야 한다 —
+    # URL Rewrite만으로는 절대 URL(http://127.0.0.1:{port}/...) target을 실제로 전달 못 함.
+    assert calls[0][1:3] == ["set", "config"]
+    assert calls[1][1:3] == ["delete", "site"]
+    assert calls[2][1:3] == ["add", "site"]
+    assert any("/bindings:http/*:80:shop.example.com" in a for a in calls[2])
+
+
+def test_iis_configure_raises_clear_error_when_arr_not_installed(monkeypatch, tmp_path, fresh_settings):
+    """ARR 미설치 시 URL Rewrite 규칙은 매칭되지만 응답이 안 오는(502/무응답) 상태로
+    조용히 배포가 "성공"하면 안 된다 — appcmd가 실패하면 바로 명확한 에러로 드러난다."""
+    monkeypatch.setenv("PAAS_IIS_SITES_ROOT", str(tmp_path / "sites"))
+    monkeypatch.setenv("PAAS_IIS_APPCMD_PATH", "appcmd.exe")
+    get_settings.cache_clear()
+
+    def fake_run(args, **kw):
+        if args[1:3] == ["set", "config"]:
+            return _Fail()
+        return _Ok()
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    try:
+        IISProxy().configure("shop", BuildProfile.release, "shop.example.com", "/", ENDPOINT, [])
+        raised = False
+    except Exception as e:
+        raised = True
+        assert "ARR" in str(e)
+    assert raised
 
 
 def test_iis_configure_raises_on_add_failure(monkeypatch, tmp_path, fresh_settings):

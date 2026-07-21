@@ -146,6 +146,25 @@ def _regenerate_base_web_config() -> None:
     )
 
 
+def _ensure_arr_proxy_enabled() -> None:
+    """URL Rewrite 규칙의 절대 URL(http://127.0.0.1:{port}/...) target은 URL Rewrite
+    모듈 자체가 아니라 ARR(Application Request Routing)의 프록시 기능이 있어야 실제로
+    전달된다 — 이 서버 레벨 설정이 꺼진 채로(또는 ARR 미설치로) 사이트를 만들면 규칙은
+    매칭되는데 응답이 안 오는(502/무응답) 상태로 조용히 배포가 "성공"해 버리므로, 베이스
+    사이트 최초 생성 시점에 명시적으로 켜고 실패하면 바로 에러로 드러낸다."""
+    appcmd = get_settings().iis_appcmd_path
+    proc = subprocess.run(
+        [appcmd, "set", "config", "-section:system.webServer/proxy", "/enabled:True", "/commit:apphost"],
+        capture_output=True, text=True,
+    )
+    if proc.returncode != 0:
+        raise IISError(
+            "ARR(Application Request Routing) 프록시 기능을 켜지 못했습니다 — ARR이 설치돼 "
+            "있는지 확인하세요(https://www.iis.net/downloads/microsoft/application-request-routing): "
+            f"{(proc.stderr or proc.stdout).strip()[:500]}"
+        )
+
+
 def _ensure_base_site() -> None:
     settings = get_settings()
     site_dir = settings.iis_sites_root / BASE_SITE_NAME
@@ -158,6 +177,7 @@ def _ensure_base_site() -> None:
     )
     if proc.returncode == 0 and proc.stdout.strip():
         return
+    _ensure_arr_proxy_enabled()
     _run_appcmd(
         "add", "site",
         f"/name:{BASE_SITE_NAME}", f"/physicalPath:{site_dir}",
@@ -200,6 +220,7 @@ class IISProxy(ReverseProxy):
         site_dir.mkdir(parents=True, exist_ok=True)
         (site_dir / "web.config").write_text(_web_config_paths(routes, redirects), encoding="utf-8")
 
+        _ensure_arr_proxy_enabled()
         subprocess.run(
             [settings.iis_appcmd_path, "delete", "site", f"/site.name:{name}"],
             capture_output=True, text=True,
