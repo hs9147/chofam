@@ -375,16 +375,30 @@ npm run build        # tsc 타입체크 + vite build → dist/
 internal·external 구분과 admin 게이트로 통제), ② GitOps 모드에서 배포 **매니페스트**(소스 아님)가
 운영자가 지정한 리포로 푸시.
 
-## DB 마이그레이션 (PostgreSQL 운영)
+## DB 마이그레이션
 
-SQLite 빠른 시작은 기동 시 자동 생성(create_all)으로 충분하다.
-**PostgreSQL 운영 전환 시에는 Alembic으로 스키마를 관리**한다:
+`create_all()`(기동 시 자동 실행)은 **아예 없는 테이블만** 새로 만든다 — 이미 있는
+테이블에 새 컬럼을 추가하는 스키마 변경(예: `projects.organization_id`,
+`redirect_rules` 테이블 등)은 반영하지 못한다. 그래서 "SQLite 빠른 시작이라
+create_all로 충분하다"는 건 **DB 파일이 아예 없는 최초 기동에만** 해당하는
+얘기다 — **이미 떠 있던 서버를 최신 코드로 업데이트할 때는 SQLite·PostgreSQL
+관계없이 반드시 Alembic으로 스키마를 맞춰야 한다:**
 
 ```bash
-# 실행 위치: platform/
+# 실행 위치: platform/ — SQLite면 PAAS_DATABASE_URL 생략(.env 설정 그대로 사용)
+python -m alembic upgrade head
+# PostgreSQL이면:
 PAAS_DATABASE_URL=postgresql://user:pw@host/paas python -m alembic upgrade head
 # 모델 변경 후 새 리비전: python -m alembic revision --autogenerate -m "설명"
 ```
+
+**증상**: 이 단계를 건너뛰면 새로 추가된 컬럼/테이블을 실제로 쓰는 API만 콕 집어
+500 Internal Server Error가 난다(다른 API는 멀쩡) — 예를 들어 조직(Organization)
+기능 도입 이전 DB로 계속 돌리다가 코드만 업데이트하면, `/orgs/sync`·`/server-config`·
+`POST /projects`처럼 `organization_id`를 만지는 엔드포인트만 "no such column"
+류의 에러로 500이 난다. `python -m alembic current`로 지금 DB가 어느 리비전인지,
+`python -m alembic heads`로 코드가 기대하는 최신 리비전이 뭔지 비교해 보면 바로
+확인된다.
 
 ## 테스트
 
