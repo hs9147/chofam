@@ -251,15 +251,15 @@ BASE=http://127.0.0.1:7000  API=$BASE/paas/api/v1  ADMIN=paas_...
 
 # 1) 프로젝트 등록
 curl -X POST $API/projects -H "x-api-key: $ADMIN" -H 'content-type: application/json' \
-  -d '{"name":"shop-api","type":"python","git_url":"https://github.com/org/shop-api",
+  -d '{"name":"portal-api","type":"python","git_url":"https://github.com/org/portal-api",
        "branch":"main","health_check_path":"/healthz"}'
 
-# 2) development 배포 → https://deploy.example.com/_/shop-api/dev/
+# 2) development 배포 → https://deploy.example.com/_/portal-api/dev/
 #    (organization_id로 등록했다면 /_/ 대신 /{조직}/ — 1절 표·3.1절 DNS 설명 참고)
 curl -X POST $API/projects/1/deploy -H "x-api-key: $ADMIN" \
   -H 'content-type: application/json' -d '{"profile":"development"}'
 
-# 3) 확인 후 release 배포 → https://deploy.example.com/_/shop-api/
+# 3) 확인 후 release 배포 → https://deploy.example.com/_/portal-api/
 curl -X POST $API/projects/1/deploy -H "x-api-key: $ADMIN" \
   -H 'content-type: application/json' -d '{"profile":"release"}'
 
@@ -448,7 +448,7 @@ curl -s $BASE/paas/health -H "x-api-key: $ADMIN"   # "tier":"enterprise" 확인
 
 ```bash
 curl -X POST $API/projects -H "x-api-key: $ADMIN" -H 'content-type: application/json' \
-  -d '{"name":"shop-api","type":"python","git_url":"https://github.com/org/shop-api"}'
+  -d '{"name":"portal-api","type":"python","git_url":"https://github.com/org/portal-api"}'
 curl -X POST $API/projects/1/deploy -H "x-api-key: $ADMIN" \
   -H 'content-type: application/json' -d '{"profile":"release"}'
 
@@ -533,16 +533,16 @@ BASE=http://127.0.0.1:7000  API=$BASE/paas/api/v1  ADMIN=paas_...
 
 # 조직 소속으로 등록(레거시 git_url 직접 지정 경로도 가능 — 3.3절과 동일)
 curl -X POST $API/projects -H "x-api-key: $ADMIN" -H 'content-type: application/json' \
-  -d '{"name":"shop-app","type":"composite","organization_id":1}'
+  -d '{"name":"portal-app","type":"composite","organization_id":1}'
 
 curl -X POST $API/projects/1/deploy -H "x-api-key: $ADMIN" \
   -H 'content-type: application/json' -d '{"profile":"release"}'
 ```
 
-배포되면 `https://deploy.example.com/{조직}/shop-app/api/*`는 backend로, 같은 경로
+배포되면 `https://deploy.example.com/{조직}/portal-app/api/*`는 backend로, 같은 경로
 아래 나머지 전체는 frontend로 자동 라우팅된다(Caddy `handle_path` / IIS URL Rewrite
 조건부 규칙 / Apache `ProxyPass` 접두사 — 3.1절에서 고른 프록시 백엔드와 무관하게
-동일하게 동작). 매칭된 접두사(`/{조직}/shop-app/api`)는 백엔드로 전달되기 전에
+동일하게 동작). 매칭된 접두사(`/{조직}/portal-app/api`)는 백엔드로 전달되기 전에
 제거된다 — 백엔드는 `/api/users`가 아니라 `/users`로 라우트를 짜면 된다.
 
 **원자적 배포**: backend/frontend 둘 중 하나만 빌드·기동에 실패하면, 실패한 컴포넌트만
@@ -560,13 +560,13 @@ curl -X POST $API/projects/1/deploy -H "x-api-key: $ADMIN" \
 ## 4. 종합 예시 — 하이브리드 구성 한 장
 
 ```
-shop-front (React)  → Netlify            (git push → 자동 배포 + PR 프리뷰)
-shop-api  (FastAPI) → 자체 PaaS release  → https://deploy.example.com/_/shop-api/
+portal-front (React)  → Netlify            (git push → 자동 배포 + PR 프리뷰)
+portal-api  (FastAPI) → 자체 PaaS release  → https://deploy.example.com/_/portal-api/
 llm-main  (vLLM)    → 자체 PaaS GPU      → project://llm-main (내부 전용)
-메일/결제            → CHO-FAM Functions  (shop-api에는 MAIL_* 모듈 주입)
+메일/결제            → CHO-FAM Functions  (portal-api에는 MAIL_* 모듈 주입)
 ```
 
-- shop-front의 API 주소는 Netlify 환경변수로 `https://shop-api.deploy.example.com` 지정
+- portal-front의 API 주소는 Netlify 환경변수로 `https://deploy.example.com/_/portal-api/` 지정
 - 자체 서버는 GPU·상시 프로세스만 담당 → 서버 1대로 시작 가능
 
 ---

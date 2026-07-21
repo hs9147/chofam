@@ -173,7 +173,7 @@ ADMIN=... BASE=http://localhost:7000/paas/api/v1
 
 # 프로젝트 등록
 curl -X POST $BASE/projects -H "x-api-key: $ADMIN" -H 'content-type: application/json' \
-  -d '{"name":"front","type":"react","git_url":"https://git.example.com/org/shop-front"}'
+  -d '{"name":"front","type":"react","git_url":"https://git.example.com/org/portal-front"}'
 
 # development 배포 → {base_domain}/_/front/dev/ (organization_id로 등록했다면 /_/ 대신 /{조직}/)
 curl -X POST $BASE/projects/1/deploy -H "x-api-key: $ADMIN" \
