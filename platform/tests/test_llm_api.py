@@ -199,6 +199,70 @@ def test_review_endpoint_with_explicit_diff(monkeypatch):
     assert r.json()["max_severity"] == "medium"
 
 
+def test_mcp_module_bind_wires_tools_into_chat_completion(monkeypatch):
+    """mcp 타입 모듈을 프로젝트에 바인딩하면 채팅 호출 시 그 서버의 도구가
+    tools=로 LLM에 전달되고, 모델이 도구를 호출하면 실제 MCP 서버까지 왕복한다."""
+    from app.services import mcp_client
+
+    c = _client()
+    pid = _create_project(c)
+    prov = _create_provider(c)
+
+    mid = c.post("/paas/api/v1/modules", json={
+        "name": "search-mcp", "type": "mcp",
+        "config": {"url": "https://mcp.example.com", "api_key": "mcp-secret"},
+    }, headers=ADMIN).json()["id"]
+    bind = c.post(f"/paas/api/v1/projects/{pid}/modules/{mid}/bind",
+                  json={"env_prefix": "SEARCH"}, headers=ADMIN)
+    assert bind.status_code == 201
+    assert bind.json()["injected_env"] == ["SEARCH_API_KEY", "SEARCH_URL"]
+
+    monkeypatch.setattr(
+        mcp_client, "_post_rpc",
+        lambda url, headers, payload: {"result": {"tools": [
+            {"name": "web_search", "description": "웹 검색", "inputSchema": {"type": "object"}},
+        ]}},
+    )
+
+    captured_payloads = []
+
+    def fake_post_chat(url, headers, payload):
+        captured_payloads.append(payload)
+        if len(captured_payloads) == 1:
+            return {"choices": [{"message": {
+                "role": "assistant", "content": None,
+                "tool_calls": [{"id": "c1", "function": {
+                    "name": "search-mcp__web_search", "arguments": '{"q": "chofam"}',
+                }}],
+            }}]}
+        return {"choices": [{"message": {"content": "검색 결과를 반영했습니다."}}]}
+
+    monkeypatch.setattr(llm_service, "_post_chat", fake_post_chat)
+
+    def fake_post_rpc_for_call(url, headers, payload):
+        if payload["method"] == "tools/list":
+            return {"result": {"tools": [
+                {"name": "web_search", "description": "웹 검색", "inputSchema": {"type": "object"}},
+            ]}}
+        assert payload["method"] == "tools/call"
+        assert payload["params"] == {"name": "web_search", "arguments": {"q": "chofam"}}
+        assert headers["authorization"] == "Bearer mcp-secret"
+        return {"result": {"content": [{"type": "text", "text": "chofam은 사내 PaaS다"}]}}
+
+    monkeypatch.setattr(mcp_client, "_post_rpc", fake_post_rpc_for_call)
+
+    sid = c.post("/paas/api/v1/chat/sessions", json={"project_id": pid, "provider_id": prov},
+                 headers=ADMIN).json()["id"]
+    r = c.post(f"/paas/api/v1/chat/sessions/{sid}/messages",
+               json={"content": "chofam이 뭐야? 검색해서 답해줘"}, headers=ADMIN)
+    assert r.status_code == 200
+    assert r.json()["reply"] == "검색 결과를 반영했습니다."
+
+    assert captured_payloads[0]["tools"][0]["function"]["name"] == "search-mcp__web_search"
+    second_messages = captured_payloads[1]["messages"]
+    assert any(m.get("role") == "tool" and "사내 PaaS" in m.get("content", "") for m in second_messages)
+
+
 def test_module_bind_and_llm_context():
     c = _client()
     pid = _create_project(c)

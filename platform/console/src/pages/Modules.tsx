@@ -12,6 +12,7 @@ const TYPE_HINTS: Record<string, string> = {
   internal_api: '{"target_project": "다른-프로젝트명"}',
   database: '{"dsn": "postgresql://user:pw@host/db"}',
   file_storage: '{"endpoint": "http://...", "bucket": "..."}',
+  mcp: '{"url": "https://mcp.example.com", "api_key": "..."}',
 };
 
 export default function Modules() {
@@ -242,8 +243,15 @@ function CreateModuleModal({
             <option value="internal_api">internal_api — 플랫폼 내 프로젝트</option>
             <option value="database">database — DB 연결</option>
             <option value="file_storage">file_storage — 파일 저장소</option>
+            <option value="mcp">mcp — 외부 MCP 서버</option>
           </select>
         </label>
+        {type === 'mcp' && (
+          <p className="mutedtext" style={{ fontSize: 12 }}>
+            프로젝트에 바인딩하면 배포 앱에 URL/API 키가 env로 주입되는 것에 더해,
+            채팅에서도 이 서버의 도구를 모델이 직접 호출할 수 있게 됩니다.
+          </p>
+        )}
         <label className="field">
           카테고리 (선택 — 예: news, llm, payment. 자원 목록에서 API를 묶어 보여줍니다)
           <input value={category} onChange={(e) => setCategory(e.target.value)} />
