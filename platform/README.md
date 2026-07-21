@@ -137,8 +137,9 @@ GET  /paas/api/v1/audit                    # 감사 로그 (admin)
 
 POST /paas/api/v1/orgs                     # {name} → 사내 Gitea에 동명 Organization 생성 (admin)
 GET  /paas/api/v1/orgs                     # 조직 목록 + 프로젝트 수
-POST /paas/api/v1/orgs/sync                # Gitea → 플랫폼 방향으로 누락된 조직/리포를 가져옴 (admin)
-                                      #   리포 type은 시그니처 파일로 추론, 추론 불가/이름 규칙 위반은 건너뛰고 보고
+POST /paas/api/v1/orgs/sync                # {on_missing_repo?: create(기본)|delete} — Gitea 기준 동기화 (admin)
+                                      #   Gitea에만 있는 조직/리포는 가져오고(type은 시그니처 파일로 추론),
+                                      #   플랫폼에만 있는(조직 소속) 프로젝트는 on_missing_repo대로 리포 재생성/프로젝트 삭제
 
 GET  /paas/api/v1/projects                 # git_url은 organization_id 소속이면 비관리자에게 마스킹
 POST /paas/api/v1/projects                 # {name, type, branch, domain?, ...}
@@ -278,14 +279,21 @@ npm run build        # tsc 타입체크 + vite build → dist/
   리포를 플랫폼이 내부에서 자동 생성·관리하며, git_url 등 메타 정보는 **일반 사용자
   응답에서 마스킹**된다(admin만 실제 값 조회 가능) — `POST /paas/api/v1/orgs`, `GET /paas/api/v1/orgs`,
   `POST /paas/api/v1/projects`의 `organization_id` 참고.
-- **Gitea 기준 동기화(반대 방향)**: 위 흐름은 플랫폼 → Gitea(생성)뿐이라, 누군가 Gitea에서
-  직접 조직/리포를 만들면 플랫폼이 모른다. `POST /paas/api/v1/orgs/sync`(admin, 콘솔
-  조직 페이지의 "Gitea에서 동기화" 버튼)가 그 반대 경로를 메운다 — Gitea에는 있지만
-  플랫폼 DB에 없는 조직/리포를 찾아 Organization/Project로 가져온다. 리포의 `type`은
-  Gitea API만으론 알 수 없어 얕은 clone으로 시그니처 파일(requirements.txt/pyproject.toml
-  →python, package.json+react 의존성→react, package.json만→node, index.html만→html,
-  backend/frontend 서브폴더 둘 다 있으면→composite)을 확인해 추론하고, 추론 불가하거나
-  이름 규칙(`^[a-z0-9][a-z0-9-]{1,40}$`)에 안 맞으면 만들지 않고 이유와 함께 건너뛴다
+- **Gitea 기준 동기화(양방향 정합성)**: 위 흐름은 플랫폼 → Gitea(생성)뿐이라, 누군가
+  Gitea에서 직접 조직/리포를 만들거나 지우면 플랫폼이 모른다. `POST /paas/api/v1/orgs/sync`
+  (admin, 콘솔 조직 페이지의 "Gitea에서 동기화" 버튼)가 그 간극을 메운다.
+  - Gitea에는 있지만 플랫폼 DB에 없는 조직/리포를 찾아 Organization/Project로 가져온다.
+    리포의 `type`은 Gitea API만으론 알 수 없어 얕은 clone으로 시그니처 파일
+    (requirements.txt/pyproject.toml→python, package.json+react 의존성→react,
+    package.json만→node, index.html만→html, backend/frontend 서브폴더 둘 다 있으면
+    →composite)을 확인해 추론하고, 추론 불가하거나 이름 규칙(`^[a-z0-9][a-z0-9-]{1,40}$`)에
+    안 맞으면 만들지 않고 이유와 함께 건너뛴다.
+  - 반대로 플랫폼(조직 소속 프로젝트)에는 있지만 Gitea에 리포가 없으면(수동 삭제 등),
+    `on_missing_repo` 파라미터대로 처리한다 — `create`(기본값)는 리포를 다시 만들고
+    `git_url`을 갱신하며, `delete`는 배포 이력·환경변수·리다이렉트 규칙 등 딸린 데이터를
+    포함해 플랫폼 쪽 프로젝트를 지운다(되돌릴 수 없음 — 콘솔은 이 선택 시 확인창을 띄운다).
+    git_url을 직접 지정한(조직 없는) 레거시 프로젝트는 애초에 Gitea 관리 대상이 아니므로
+    대상에서 제외된다.
   (`services/gitea_sync.py`). 자동/주기 실행은 하지 않는다 — 필요할 때 관리자가 수동으로.
 - **zip/폴더 업로드 등록**: `POST /paas/api/v1/projects/upload`(조직 필수) — git 저장소가 아직 없는
   코드를 zip 또는 폴더(다중 파일)로 올리면 플랫폼이 사내 Gitea에 신규 리포를 만들어

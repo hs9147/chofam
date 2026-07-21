@@ -25,6 +25,8 @@ class GiteaSyncSkip(BaseModel):
 class GiteaSyncResult(BaseModel):
     orgs_created: list[str]
     projects_created: list[str]
+    repos_created: list[str]
+    projects_deleted: list[str]
     skipped: list[GiteaSyncSkip]
 
 

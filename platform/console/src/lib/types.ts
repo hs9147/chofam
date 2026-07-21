@@ -45,6 +45,8 @@ export interface GiteaSyncSkip {
 export interface GiteaSyncResult {
   orgs_created: string[];
   projects_created: string[];
+  repos_created: string[];
+  projects_deleted: string[];
   skipped: GiteaSyncSkip[];
 }
 

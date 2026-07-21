@@ -126,12 +126,108 @@ def test_sync_skips_project_on_clone_failure(monkeypatch):
         assert "clone 실패" in result["skipped"][0]["reason"]
 
 
+def test_sync_recreates_missing_repo_by_default(monkeypatch):
+    """플랫폼엔 있지만 Gitea에 리포가 없는 조직 소속 프로젝트는 기본값(create)에서
+    Gitea에 리포를 다시 만들고 git_url을 갱신한다 — 프로젝트는 지우지 않는다."""
+    with SessionLocal() as db:
+        org = Organization(name="acme")
+        db.add(org)
+        db.commit()
+        db.add(Project(name="orphaned", type="python", organization_id=org.id,
+                        git_url="https://git.example.com/acme/orphaned.git"))
+        db.commit()
+
+    monkeypatch.setattr(gitea, "list_orgs", lambda: [{"username": "acme"}])
+    monkeypatch.setattr(gitea, "list_org_repos", lambda org_name: [])  # Gitea엔 리포가 없음
+    ensure_calls = []
+    monkeypatch.setattr(
+        gitea, "ensure_repo",
+        lambda org_name, repo_name: (ensure_calls.append((org_name, repo_name)),
+                                      "https://git.example.com/acme/orphaned.git")[1],
+    )
+
+    with SessionLocal() as db:
+        result = gitea_sync.sync_from_gitea(db)  # on_missing_repo 기본값 "create"
+        assert result["repos_created"] == ["orphaned"]
+        assert result["projects_deleted"] == []
+        assert ensure_calls == [("acme", "orphaned")]
+
+        project = db.execute(select(Project).where(Project.name == "orphaned")).scalar_one()
+        assert project.git_url == "https://git.example.com/acme/orphaned.git"
+
+
+def test_sync_deletes_project_when_requested(monkeypatch):
+    """on_missing_repo="delete"면 리포를 되살리지 않고 플랫폼 쪽 프로젝트와 딸린
+    행(배포 이력 등)을 지운다."""
+    from app.models import Deployment
+
+    with SessionLocal() as db:
+        org = Organization(name="acme")
+        db.add(org)
+        db.commit()
+        project = Project(name="orphaned", type="python", organization_id=org.id,
+                           git_url="https://git.example.com/acme/orphaned.git")
+        db.add(project)
+        db.commit()
+        db.add(Deployment(project_id=project.id, git_sha="a" * 40, image_tag="orphaned:a",
+                          profile="release", status="running"))
+        db.commit()
+        project_id = project.id
+
+    monkeypatch.setattr(gitea, "list_orgs", lambda: [{"username": "acme"}])
+    monkeypatch.setattr(gitea, "list_org_repos", lambda org_name: [])
+    monkeypatch.setattr(
+        gitea, "ensure_repo",
+        lambda *a: (_ for _ in ()).throw(AssertionError("delete 모드에선 리포를 만들면 안 됨")),
+    )
+
+    class _FakeRuntime:
+        def stop(self, *a):
+            pass
+
+    from app.services import deployer
+    monkeypatch.setattr(deployer, "get_runtime", lambda: _FakeRuntime())
+
+    with SessionLocal() as db:
+        result = gitea_sync.sync_from_gitea(db, on_missing_repo="delete")
+        assert result["projects_deleted"] == ["orphaned"]
+        assert result["repos_created"] == []
+
+        assert db.execute(select(Project).where(Project.id == project_id)).scalar_one_or_none() is None
+        assert db.execute(
+            select(Deployment).where(Deployment.project_id == project_id)
+        ).scalar_one_or_none() is None
+
+
+def test_sync_ignores_legacy_project_without_organization(monkeypatch):
+    """git_url을 직접 지정한(조직 없는) 프로젝트는 Gitea 관리 대상이 아니므로
+    "리포 없음" 판정 자체를 받지 않는다."""
+    with SessionLocal() as db:
+        db.add(Project(name="legacy", type="python", git_url="https://github.com/org/legacy"))
+        db.commit()
+
+    monkeypatch.setattr(gitea, "list_orgs", lambda: [])
+    monkeypatch.setattr(
+        gitea, "ensure_repo",
+        lambda *a: (_ for _ in ()).throw(AssertionError("레거시 프로젝트는 건드리면 안 됨")),
+    )
+
+    with SessionLocal() as db:
+        result = gitea_sync.sync_from_gitea(db)
+        assert result["repos_created"] == []
+        assert result["projects_deleted"] == []
+        assert result["skipped"] == []
+
+
 def test_sync_endpoint_admin_only(monkeypatch):
     monkeypatch.setattr(gitea, "list_orgs", lambda: [])
     c = TestClient(create_app())
     r = c.post("/paas/api/v1/orgs/sync", headers=ADMIN)
     assert r.status_code == 200, r.text
-    assert r.json() == {"orgs_created": [], "projects_created": [], "skipped": []}
+    assert r.json() == {
+        "orgs_created": [], "projects_created": [], "repos_created": [],
+        "projects_deleted": [], "skipped": [],
+    }
 
     member_key = c.post("/paas/api/v1/keys", json={"name": "dev"}, headers=ADMIN).json()["key"]
     r2 = c.post("/paas/api/v1/orgs/sync", headers={"x-api-key": member_key})
