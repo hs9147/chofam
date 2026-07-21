@@ -20,6 +20,7 @@ function groupResources(items: ResourceItem[]) {
   const apiByCategory: Record<string, ResourceItem[]> = {};
   const files: ResourceItem[] = [];
   const databases: ResourceItem[] = [];
+  const mcpServers: ResourceItem[] = [];
   for (const r of items) {
     if (r.type === 'external_api' || r.type === 'internal_api') {
       const key = r.category || '기타';
@@ -28,9 +29,11 @@ function groupResources(items: ResourceItem[]) {
       files.push(r);
     } else if (r.type === 'database') {
       databases.push(r);
+    } else if (r.type === 'mcp') {
+      mcpServers.push(r);
     }
   }
-  return { apiByCategory, files, databases };
+  return { apiByCategory, files, databases, mcpServers };
 }
 
 export default function Chat() {
@@ -187,7 +190,7 @@ export default function Chat() {
           <h2 style={{ margin: '0 0 10px' }}>사용 가능한 자원</h2>
           <Async state={resourcesState} empty="등록된 자원이 없습니다.">
             {(items) => {
-              const { apiByCategory, files, databases } = groupResources(items);
+              const { apiByCategory, files, databases, mcpServers } = groupResources(items);
               return (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                   {Object.keys(apiByCategory).length > 0 && (
@@ -230,6 +233,21 @@ export default function Chat() {
                       <div className="row" style={{ flexWrap: 'wrap' }}>
                         {databases.map((r) => (
                           <span key={r.id} className="status warn">
+                            {r.name}
+                            {r.scope === 'org' && ' (조직)'}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {mcpServers.length > 0 && (
+                    <div>
+                      <div className="mutedtext" style={{ fontSize: 11, marginBottom: 6 }}>
+                        MCP 서버 (바인딩하면 채팅에서 모델이 도구를 직접 호출)
+                      </div>
+                      <div className="row" style={{ flexWrap: 'wrap' }}>
+                        {mcpServers.map((r) => (
+                          <span key={r.id} className="status ok">
                             {r.name}
                             {r.scope === 'org' && ' (조직)'}
                           </span>

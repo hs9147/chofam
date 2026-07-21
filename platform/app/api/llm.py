@@ -29,6 +29,7 @@ from ..schemas import (
 from ..security import encrypt_value, require_admin, require_api_key
 from ..services import codemap as codemap_service
 from ..services import llm as llm_service
+from ..services import mcp_client
 from ..services import modules as modules_service
 from ..services import workspace
 from ..services.build import BuildError, checkout
@@ -145,8 +146,17 @@ async def post_message(
     messages.extend({"role": m.role, "content": m.content} for m in history)
     messages.append({"role": "user", "content": body.content})
 
+    # 프로젝트에 mcp 타입 모듈이 바인딩돼 있으면 그 서버들의 도구를 tools=로
+    # 넘겨 모델이 직접 호출할 수 있게 한다(services/mcp_client.py) — tools/list
+    # 호출도 블로킹 HTTP라 chat_completion과 함께 스레드에서 돈다.
+    mcp_servers = modules_service.mcp_servers_for_project(db, project)
+    tools, registry = mcp_client.build_openai_tools(mcp_servers) if mcp_servers else ([], {})
+    tool_executor = mcp_client.make_tool_executor(registry) if tools else None
+
     try:
-        reply = await asyncio.to_thread(llm_service.chat_completion, provider, messages, db)
+        reply = await asyncio.to_thread(
+            llm_service.chat_completion, provider, messages, db, tools or None, tool_executor,
+        )
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"llm call failed: {e}")
 

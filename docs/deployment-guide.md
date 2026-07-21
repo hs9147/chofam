@@ -413,6 +413,23 @@ curl -X POST $API/projects/1/modules/1/bind -H "x-api-key: $ADMIN" \
 # 다음 배포부터 MAIL_URL, MAIL_API_KEY 자동 주입 → 코드에서 process.env/os.environ으로 사용
 ```
 
+**외부 MCP 서버 연결**은 타입만 `mcp`로 등록하면 된다 — 배포 앱에 URL/키가 env로
+주입되는 건 다른 모듈과 같지만, **이 모듈을 프로젝트에 바인딩해 두면 채팅
+(`/chat/sessions/{id}/messages`)에서 모델이 그 서버의 도구를 직접 호출**할 수
+있게 된다(OpenAI 호환 tools= 프로토콜, `services/mcp_client.py`):
+
+```bash
+curl -X POST $API/modules -H "x-api-key: $ADMIN" -H 'content-type: application/json' \
+  -d '{"name":"search-mcp","type":"mcp",
+       "config":{"url":"https://mcp.example.com","api_key":"<발급 키>"}}'
+curl -X POST $API/projects/1/modules/2/bind -H "x-api-key: $ADMIN" \
+  -H 'content-type: application/json' -d '{"env_prefix":"SEARCH"}'
+# 이후 이 프로젝트로 채팅하면 search-mcp 서버의 tools/list 결과가 자동으로 모델에 넘어가고,
+# 모델이 도구를 호출하면 플랫폼이 실제 서버까지 왕복해 결과를 돌려준다(최대 6라운드).
+```
+
+단일 JSON 응답을 주는 MCP 서버만 지원한다(SSE 스트리밍 트랜스포트는 범위 밖).
+
 ### 3.8 사내 Git 서버 (기업용 — GitHub 대체)
 
 소스가 사외 SaaS로 나가면 안 되는 기업용 배포는 GitHub 대신 **사내 Gitea**를 쓴다.

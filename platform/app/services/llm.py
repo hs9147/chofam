@@ -5,6 +5,7 @@
 """
 import json
 import re
+from typing import Callable
 
 import httpx
 from sqlalchemy import select
@@ -50,14 +51,46 @@ def resolve_base_url(base_url: str, db: Session | None = None) -> str:
     return f"http://{settings.base_domain}{path}"
 
 
-def chat_completion(provider: LlmProvider, messages: list[dict], db: Session | None = None) -> str:
+MAX_TOOL_ROUNDS = 6
+
+
+def chat_completion(
+    provider: LlmProvider,
+    messages: list[dict],
+    db: Session | None = None,
+    tools: list[dict] | None = None,
+    tool_executor: Callable[[str, dict], str] | None = None,
+    _round: int = 0,
+) -> str:
+    """tools/tool_executor를 주면(예: 프로젝트에 바인딩된 MCP 서버) OpenAI 호환
+    tool-call 프로토콜로 모델↔도구를 오간다 — 모델이 더 이상 tool_calls를 요청하지
+    않을 때까지(최대 MAX_TOOL_ROUNDS회) 반복하고 최종 텍스트만 반환한다. tools가
+    없으면 기존과 동일하게 단발 completion."""
     url = resolve_base_url(provider.base_url, db) + "/v1/chat/completions"
     headers = {"content-type": "application/json"}
     if provider.api_key_encrypted:
         headers["authorization"] = f"Bearer {decrypt_value(provider.api_key_encrypted)}"
     payload = {"model": provider.model, "messages": messages}
+    if tools:
+        payload["tools"] = tools
     data = _post_chat(url, headers, payload)
-    return data["choices"][0]["message"]["content"]
+    message = data["choices"][0]["message"]
+
+    tool_calls = message.get("tool_calls")
+    if tool_calls and tool_executor and _round < MAX_TOOL_ROUNDS:
+        next_messages = [*messages, message]
+        for tc in tool_calls:
+            fn = tc.get("function", {})
+            try:
+                arguments = json.loads(fn.get("arguments") or "{}")
+            except json.JSONDecodeError:
+                arguments = {}
+            result = tool_executor(fn.get("name", ""), arguments)
+            next_messages.append({
+                "role": "tool", "tool_call_id": tc.get("id", ""), "content": result,
+            })
+        return chat_completion(provider, next_messages, db, tools, tool_executor, _round + 1)
+    return message["content"]
 
 
 def _post_chat(url: str, headers: dict, payload: dict) -> dict:
