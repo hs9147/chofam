@@ -46,10 +46,13 @@ class PathRoute:
 class ReverseProxy(ABC):
     @abstractmethod
     def configure(
-        self, project_name: str, profile: BuildProfile, domain: str,
+        self, project_name: str, profile: BuildProfile, domain: str, path_prefix: str,
         endpoint: Endpoint, redirects: list[RedirectSpec],
     ) -> None:
-        """도메인 → endpoint 라우팅 + redirect/rewrite 규칙을 반영하고 무중단 reload한다."""
+        """domain 아래 path_prefix 경로 → endpoint 라우팅 + redirect/rewrite 규칙을
+        반영하고 무중단 reload한다. path_prefix가 "/"(또는 "")면 도메인 전체가 이
+        프로젝트 것(커스텀 도메인 등) — 그 외에는 domain을 여러 프로젝트가 공유하는
+        전제로 서브패스 라우팅을 구성한다(services/proxy/__init__.py의 path_prefix_for)."""
 
     @abstractmethod
     def configure_paths(

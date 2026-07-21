@@ -91,7 +91,7 @@ def create_preview_sync(
         )
         endpoint = get_runtime().start(spec)
         if settings.tier == "small":
-            proxy.configure(unit, BuildProfile.development, domain, endpoint)
+            proxy.configure(unit, BuildProfile.development, domain, "/", endpoint)
         record.url = f"https://{domain}"
         record.status = PreviewStatus.running
         db.commit()

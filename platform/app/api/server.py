@@ -22,7 +22,7 @@ from ..schemas import (
 from ..security import require_api_key
 from ..services import deployer
 from ..services.build import COMPOSITE_COMPONENTS
-from ..services.proxy import domain_for
+from ..services.proxy import domain_for, path_prefix_for
 
 router = APIRouter(tags=["server"])
 
@@ -76,11 +76,13 @@ def server_config(db: Session = Depends(get_db), _: ApiKey = Depends(require_api
                     status = runtime.status(p.name, profile)
                 except Exception as e:  # noqa: BLE001 — 런타임 미설치/미접근이 전체 화면을 막지 않게
                     status = f"unknown ({e})"
+            org_name = p.organization.name if p.organization else None
             sites.append(ServerConfigSite(
                 project_id=p.id,
                 project_name=p.name,
                 profile=profile,
                 domain=domain_for(p.name, p.domain, profile),
+                path_prefix=path_prefix_for(org_name, p.name, p.domain, profile),
                 status=status,
                 redirect_count=counts.get(p.id, 0),
                 components=components,

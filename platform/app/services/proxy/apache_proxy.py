@@ -1,9 +1,21 @@
 """1차(small) 리버스프록시 대안 — Apache httpd (mod_proxy + mod_rewrite).
 
-프로젝트별 VirtualHost 설정 파일을 PAAS_APACHE_SITES_DIR에 생성하고, 설정 반영을 위해
-PAAS_APACHE_RELOAD_CMD(기본 "apachectl graceful")를 실행한다. 파일을 어느 Include
-디렉티브로 불러올지는 Apache 본 설정(httpd.conf) 쪽의 몫이다 — Caddy의
-"import <sites_dir>/*.caddy" 관례와 동일하게, 운영자가 한 번만 연결해두면 된다.
+배포 URL은 서브패스 기반이다: 프로젝트들은 기본적으로 base_domain 하나를 공유하고
+/{조직}/{프로젝트}/ 경로로 구분된다(services/proxy/__init__.py의 path_prefix_for).
+그래서 프로젝트별로 독립된 <VirtualHost>를 만들 수 없다 — 여러 파일에 같은
+ServerName이 반복되면 Apache는 처음 로드된 VirtualHost만 매칭하고 나머지는
+조용히 무시한다(에러도 안 내고 그냥 안 먹힌다 — 원인 파악이 더 어려워 Caddy보다
+위험).
+
+대신 Caddy의 "import 디렉터리 글롭"과 동일한 패턴을 쓴다: base_domain용 정적
+VirtualHost 파일(_base.conf) 하나가 IncludeOptional handles/*.conf로 프로젝트별
+조각을 끌어오고, 각 조각은 ProxyPass/redirect 지시어만 담는다(mod_proxy의
+ProxyPass는 지정한 경로 접두사를 스스로 벗겨내므로 <Location> 래핑이 따로
+필요없다). PAAS_APACHE_SITES_DIR을 Include하는 메인 httpd.conf 설정은 기존과
+동일하게 한 번만 연결해두면 된다.
+
+release 배포에 커스텀 도메인(project.domain)을 지정한 예외만 기존처럼 독립된
+VirtualHost 파일을 그대로 쓴다.
 """
 import subprocess
 
@@ -13,30 +25,54 @@ from ..runtime.base import Endpoint
 from .base import PathRoute, RedirectSpec, ReverseProxy, site_name
 
 
+def _prefixed(path_prefix: str, sub_path: str) -> str:
+    """redirect/rewrite의 from_path/to_path는 프로젝트 자신의 경로 기준이므로,
+    공유 사이트(VirtualHost 루트에 이어붙는 조각)에서는 조직/프로젝트 접두사를
+    명시적으로 붙여야 한다."""
+    return path_prefix.rstrip("/") + "/" + sub_path.lstrip("/")
+
+
 def _directive(r: RedirectSpec) -> str:
     if r.kind == "redirect":
         return f"    Redirect {r.status_code} {r.from_path} {r.to_path}\n"
     return f"    RewriteRule ^{r.from_path}$ {r.to_path} [L]\n"
 
 
-def _vhost_conf(domain: str, endpoint: Endpoint, redirects: list[RedirectSpec]) -> str:
-    rewrite_engine = "    RewriteEngine On\n" if any(r.kind == "rewrite" for r in redirects) else ""
-    directives = "".join(_directive(r) for r in redirects)
-    return (
-        "<VirtualHost *:80>\n"
-        f"    ServerName {domain}\n"
-        f"{rewrite_engine}"
-        f"{directives}"
-        "    ProxyPreserveHost On\n"
-        f"    ProxyPass / http://{endpoint.host}:{endpoint.port}/\n"
-        f"    ProxyPassReverse / http://{endpoint.host}:{endpoint.port}/\n"
-        "</VirtualHost>\n"
-    )
-
-
 def _conf_file(project_name: str, profile: BuildProfile):
     settings = get_settings()
     return settings.apache_sites_dir / f"{site_name(project_name, profile)}.conf"
+
+
+def _handles_dir():
+    settings = get_settings()
+    d = settings.apache_sites_dir / "handles"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def _handle_file(project_name: str, profile: BuildProfile):
+    return _handles_dir() / f"{site_name(project_name, profile)}.conf"
+
+
+def _is_shared(domain: str) -> bool:
+    return domain == get_settings().base_domain
+
+
+def _ensure_base_vhost() -> None:
+    settings = get_settings()
+    base_file = settings.apache_sites_dir / "_base.conf"
+    if base_file.exists():
+        return
+    handles_dir = _handles_dir()
+    base_file.write_text(
+        "<VirtualHost *:80>\n"
+        f"    ServerName {settings.base_domain}\n"
+        "    ProxyPreserveHost On\n"
+        "    RewriteEngine On\n"
+        f"    IncludeOptional {handles_dir}/*.conf\n"
+        "</VirtualHost>\n",
+        encoding="utf-8",
+    )
 
 
 def _path_directives(routes: list[PathRoute]) -> str:
@@ -56,6 +92,7 @@ def _vhost_conf_paths(domain: str, routes: list[PathRoute], redirects: list[Redi
     root = next((r for r in routes if r.path_prefix in ("/", "")), routes[-1])
     rewrite_engine = "    RewriteEngine On\n" if any(r.kind == "rewrite" for r in redirects) else ""
     directives = "".join(_directive(r) for r in redirects)
+    root_prefix = "/" + root.path_prefix.strip("/") + "/" if root.path_prefix not in ("/", "") else "/"
     return (
         "<VirtualHost *:80>\n"
         f"    ServerName {domain}\n"
@@ -63,29 +100,57 @@ def _vhost_conf_paths(domain: str, routes: list[PathRoute], redirects: list[Redi
         f"{directives}"
         "    ProxyPreserveHost On\n"
         f"{_path_directives(routes)}"
-        f"    ProxyPass / http://{root.endpoint.host}:{root.endpoint.port}/\n"
-        f"    ProxyPassReverse / http://{root.endpoint.host}:{root.endpoint.port}/\n"
+        f"    ProxyPass {root_prefix} http://{root.endpoint.host}:{root.endpoint.port}/\n"
+        f"    ProxyPassReverse {root_prefix} http://{root.endpoint.host}:{root.endpoint.port}/\n"
         "</VirtualHost>\n"
     )
 
 
+def _shared_fragment(routes: list[PathRoute], redirects: list[RedirectSpec]) -> str:
+    """base VirtualHost에 IncludeOptional로 이어붙는 조각 — <VirtualHost> 래핑 없이
+    ProxyPass/redirect 지시어만 담는다."""
+    root = next((r for r in routes if r.path_prefix in ("/", "")), routes[-1])
+    directives = "".join(
+        _directive(RedirectSpec(
+            from_path=_prefixed(root.path_prefix, r.from_path),
+            to_path=_prefixed(root.path_prefix, r.to_path),
+            kind=r.kind, status_code=r.status_code,
+        ))
+        for r in redirects
+    )
+    root_prefix = "/" + root.path_prefix.strip("/") + "/"
+    return (
+        f"{directives}"
+        f"{_path_directives(routes)}"
+        f"    ProxyPass {root_prefix} http://{root.endpoint.host}:{root.endpoint.port}/\n"
+        f"    ProxyPassReverse {root_prefix} http://{root.endpoint.host}:{root.endpoint.port}/\n"
+    )
+
+
 class ApacheProxy(ReverseProxy):
-    def configure(self, project_name, profile: BuildProfile, domain, endpoint: Endpoint,
-                  redirects: list[RedirectSpec]) -> None:
-        _conf_file(project_name, profile).write_text(
-            _vhost_conf(domain, endpoint, redirects), encoding="utf-8",
+    def configure(self, project_name, profile: BuildProfile, domain, path_prefix,
+                  endpoint: Endpoint, redirects: list[RedirectSpec]) -> None:
+        self.configure_paths(
+            project_name, profile, domain, [PathRoute(path_prefix=path_prefix, endpoint=endpoint)],
+            redirects,
         )
-        self._reload()
 
     def configure_paths(self, project_name, profile: BuildProfile, domain,
                          routes: list[PathRoute], redirects: list[RedirectSpec]) -> None:
-        _conf_file(project_name, profile).write_text(
-            _vhost_conf_paths(domain, routes, redirects), encoding="utf-8",
-        )
+        if _is_shared(domain):
+            _ensure_base_vhost()
+            _handle_file(project_name, profile).write_text(
+                _shared_fragment(routes, redirects), encoding="utf-8",
+            )
+        else:
+            _conf_file(project_name, profile).write_text(
+                _vhost_conf_paths(domain, routes, redirects), encoding="utf-8",
+            )
         self._reload()
 
     def remove(self, project_name, profile: BuildProfile) -> None:
         _conf_file(project_name, profile).unlink(missing_ok=True)
+        _handle_file(project_name, profile).unlink(missing_ok=True)
         self._reload()
 
     def _reload(self) -> bool:

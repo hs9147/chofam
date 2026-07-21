@@ -7,9 +7,11 @@ import json
 import re
 
 import httpx
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from ..config import get_settings
-from ..models import LlmProvider
+from ..models import BuildProfile, LlmProvider, Project
 from ..security import decrypt_value
 
 EDIT_SYSTEM_PROMPT = """You are a coding assistant working inside an internal PaaS.
@@ -24,16 +26,32 @@ Reply in Korean as a JSON array of findings:
 Return [] if the diff looks fine. Reply with JSON only."""
 
 
-def resolve_base_url(base_url: str) -> str:
-    """project://name → 플랫폼에 release 프로필로 배포된 프로젝트의 도메인."""
+def resolve_base_url(base_url: str, db: Session | None = None) -> str:
+    """project://name → 플랫폼에 release 프로필로 배포된 프로젝트의 실제 URL.
+
+    1차(small)는 서브패스 기반 배포이므로(services/proxy/__init__.py의
+    path_prefix_for), 대상 프로젝트의 조직에 맞는 경로를 써야 실제 배포와 일치한다.
+    db가 없으면(세션을 못 넘기는 호출부) 조직을 알 수 없어 "_" 자리로 안전하게
+    떨어진다 — 조직 소속 llm 프로젝트라면 가능한 경우 db를 넘길 것."""
     if not base_url.startswith("project://"):
         return base_url.rstrip("/")
     name = base_url.removeprefix("project://").strip("/")
-    return f"http://{name}.{get_settings().base_domain}"
+    settings = get_settings()
+    if settings.tier == "enterprise":
+        return f"http://{name}.{settings.base_domain}"
+    from .proxy import path_prefix_for  # noqa: PLC0415 — 순환 import 회피
+
+    org_name = None
+    if db is not None:
+        target = db.execute(select(Project).where(Project.name == name)).scalar_one_or_none()
+        if target is not None and target.organization is not None:
+            org_name = target.organization.name
+    path = path_prefix_for(org_name, name, None, BuildProfile.release)
+    return f"http://{settings.base_domain}{path}"
 
 
-def chat_completion(provider: LlmProvider, messages: list[dict]) -> str:
-    url = resolve_base_url(provider.base_url) + "/v1/chat/completions"
+def chat_completion(provider: LlmProvider, messages: list[dict], db: Session | None = None) -> str:
+    url = resolve_base_url(provider.base_url, db) + "/v1/chat/completions"
     headers = {"content-type": "application/json"}
     if provider.api_key_encrypted:
         headers["authorization"] = f"Bearer {decrypt_value(provider.api_key_encrypted)}"
@@ -65,13 +83,14 @@ def extract_diff(text: str) -> str | None:
     return None
 
 
-def review_diff(provider: LlmProvider, diff: str) -> list[dict]:
+def review_diff(provider: LlmProvider, diff: str, db: Session | None = None) -> list[dict]:
     reply = chat_completion(
         provider,
         [
             {"role": "system", "content": REVIEW_SYSTEM_PROMPT},
             {"role": "user", "content": f"```diff\n{diff}\n```"},
         ],
+        db,
     )
     try:
         # 모델이 펜스로 감싸는 경우까지 허용

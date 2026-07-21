@@ -69,7 +69,7 @@ def bind_module(
     audit.record(db, key.name, "module.bind", project.name,
                  {"module": module.name, "prefix": body.env_prefix})
     # 주입될 환경변수 키를 미리 보여준다 (값은 배포 시에만 주입)
-    return {"injected_env": sorted(svc.binding_env(module, body.env_prefix).keys())}
+    return {"injected_env": sorted(svc.binding_env(module, body.env_prefix, db=db).keys())}
 
 
 @router.get("/modules/search")

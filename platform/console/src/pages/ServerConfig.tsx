@@ -54,10 +54,14 @@ export default function ServerConfig() {
         )}
       </div>
       <p className="mutedtext" style={{ fontSize: 12 }}>
-        프로젝트별 라우팅(도메인)·실행 상태·리다이렉트 규칙 수를 한눈에 봅니다. 리다이렉트/재작성
-        규칙은 프로젝트당 하나로 관리되며 다음 배포·롤백부터 반영됩니다. 복합(백엔드+프론트엔드)
-        프로젝트는 도메인 하나 아래 <code>/api/*</code>(백엔드)·<code>/*</code>(프론트엔드)로
-        자동 라우팅됩니다 — 아래 다이어그램에서 컴포넌트별 상태를 볼 수 있습니다.
+        프로젝트별 라우팅(URL)·실행 상태·리다이렉트 규칙 수를 한눈에 봅니다. 배포는
+        기본적으로 서브패스로 구성됩니다 — <code>/조직/프로젝트/</code>(development는
+        그 아래 <code>/dev/</code>), 조직이 없는 프로젝트는 <code>/_/프로젝트/</code>.
+        커스텀 도메인을 지정한 release 배포만 예외로 그 도메인 루트를 그대로 씁니다.
+        리다이렉트/재작성 규칙은 프로젝트당 하나로 관리되며 다음 배포·롤백부터
+        반영됩니다. 복합(백엔드+프론트엔드) 프로젝트는 같은 경로 아래 <code>api/*</code>
+        (백엔드)·나머지(프론트엔드)로 자동 라우팅됩니다 — 아래 다이어그램에서
+        컴포넌트별 상태를 볼 수 있습니다.
       </p>
       {error && <p className="error">{error}</p>}
       {showTopology && state.data && <TopologyDiagram cfg={state.data} />}
@@ -68,7 +72,7 @@ export default function ServerConfig() {
               <tr>
                 <th>프로젝트</th>
                 <th>프로필</th>
-                <th>도메인</th>
+                <th>URL</th>
                 <th>상태</th>
                 <th>리다이렉트</th>
                 <th style={{ width: 280 }}>동작</th>
@@ -82,7 +86,7 @@ export default function ServerConfig() {
                   <tr key={`${s.project_id}-${s.profile}`}>
                     <td>{s.project_name}</td>
                     <td><StatusPill value={s.profile} /></td>
-                    <td className="mono">{s.domain}</td>
+                    <td className="mono">{s.domain}{s.path_prefix !== '/' ? s.path_prefix : ''}</td>
                     <td><StatusPill value={s.status} /></td>
                     <td>{s.redirect_count}</td>
                     <td>
