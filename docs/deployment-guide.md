@@ -365,6 +365,12 @@ npm run build
 네이티브 실행 시 알아둘 것:
 
 - `PAAS_HOST_OS`는 `windows`로 자동 감지된다. GPU는 Docker Desktop의 WSL2 백엔드를 경유해 지원.
+- **git 체크아웃 경로(`PAAS_WORK_DIR`, 기본 `./data/workspaces` — `platform/` 기준
+  상대경로)**: 코드 확인 화면·채팅·빌드가 프로젝트별로 `{PAAS_WORK_DIR}/{프로젝트명}`에
+  git clone/fetch한다. 플랫폼을 실행하는 계정(서비스 계정 등)이 그 경로에 쓰기 권한이
+  없으면 `git fetch failed: ... Permission denied` 같은 에러가 난다 — 절대경로로 다른
+  드라이브를 지정할 수 있다(예: `PAAS_WORK_DIR=D:\paas-data\workspaces`). 빌드 로그
+  위치(`PAAS_BUILD_LOG_DIR`, 기본 `./data/build-logs`)도 동일한 방식으로 옮길 수 있다.
 - Caddy: `winget install CaddyServer.Caddy` (또는 scoop/choco) 후 Caddyfile에
   `import C:\paas\platform\data\caddy-sites\*.caddy` 추가. `caddy run --config <Caddyfile>`.
 - **IIS를 리버스프록시로 쓰려면**(`PAAS_PROXY_BACKEND=iis`) 먼저 서버 역할에서
