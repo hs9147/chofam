@@ -137,6 +137,8 @@ GET  /paas/api/v1/audit                    # 감사 로그 (admin)
 
 POST /paas/api/v1/orgs                     # {name} → 사내 Gitea에 동명 Organization 생성 (admin)
 GET  /paas/api/v1/orgs                     # 조직 목록 + 프로젝트 수
+POST /paas/api/v1/orgs/sync                # Gitea → 플랫폼 방향으로 누락된 조직/리포를 가져옴 (admin)
+                                      #   리포 type은 시그니처 파일로 추론, 추론 불가/이름 규칙 위반은 건너뛰고 보고
 
 GET  /paas/api/v1/projects                 # git_url은 organization_id 소속이면 비관리자에게 마스킹
 POST /paas/api/v1/projects                 # {name, type, branch, domain?, ...}
@@ -276,6 +278,15 @@ npm run build        # tsc 타입체크 + vite build → dist/
   리포를 플랫폼이 내부에서 자동 생성·관리하며, git_url 등 메타 정보는 **일반 사용자
   응답에서 마스킹**된다(admin만 실제 값 조회 가능) — `POST /paas/api/v1/orgs`, `GET /paas/api/v1/orgs`,
   `POST /paas/api/v1/projects`의 `organization_id` 참고.
+- **Gitea 기준 동기화(반대 방향)**: 위 흐름은 플랫폼 → Gitea(생성)뿐이라, 누군가 Gitea에서
+  직접 조직/리포를 만들면 플랫폼이 모른다. `POST /paas/api/v1/orgs/sync`(admin, 콘솔
+  조직 페이지의 "Gitea에서 동기화" 버튼)가 그 반대 경로를 메운다 — Gitea에는 있지만
+  플랫폼 DB에 없는 조직/리포를 찾아 Organization/Project로 가져온다. 리포의 `type`은
+  Gitea API만으론 알 수 없어 얕은 clone으로 시그니처 파일(requirements.txt/pyproject.toml
+  →python, package.json+react 의존성→react, package.json만→node, index.html만→html,
+  backend/frontend 서브폴더 둘 다 있으면→composite)을 확인해 추론하고, 추론 불가하거나
+  이름 규칙(`^[a-z0-9][a-z0-9-]{1,40}$`)에 안 맞으면 만들지 않고 이유와 함께 건너뛴다
+  (`services/gitea_sync.py`). 자동/주기 실행은 하지 않는다 — 필요할 때 관리자가 수동으로.
 - **zip/폴더 업로드 등록**: `POST /paas/api/v1/projects/upload`(조직 필수) — git 저장소가 아직 없는
   코드를 zip 또는 폴더(다중 파일)로 올리면 플랫폼이 사내 Gitea에 신규 리포를 만들어
   최초 커밋으로 push한다. 대용량·악성 업로드 방어(`app/services/upload.py`):

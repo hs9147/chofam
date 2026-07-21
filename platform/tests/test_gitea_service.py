@@ -109,6 +109,35 @@ def test_ensure_webhook_registers_when_absent(monkeypatch, fresh_settings):
     assert kw["json"]["config"]["secret"] == "whsecret"
 
 
+def test_list_orgs_paginates_until_short_page(monkeypatch):
+    pages = {
+        1: [{"username": f"org-{i}"} for i in range(50)],
+        2: [{"username": "org-50"}],
+    }
+    calls = []
+
+    def fake_get(url, **kw):
+        page = kw["params"]["page"]
+        calls.append(page)
+        return _Res(200, pages.get(page, []))
+
+    monkeypatch.setattr(gitea.httpx, "get", fake_get)
+    orgs = gitea.list_orgs()
+    assert len(orgs) == 51
+    assert calls == [1, 2]
+
+
+def test_list_org_repos_stops_on_empty_page(monkeypatch):
+    monkeypatch.setattr(gitea.httpx, "get", lambda url, **kw: _Res(200, []))
+    assert gitea.list_org_repos("acme") == []
+
+
+def test_list_orgs_error_raises(monkeypatch):
+    monkeypatch.setattr(gitea.httpx, "get", lambda url, **kw: _Res(500, text="boom"))
+    with pytest.raises(gitea.GiteaError, match="500"):
+        gitea.list_orgs()
+
+
 def test_ensure_webhook_idempotent_when_already_registered(monkeypatch, fresh_settings):
     monkeypatch.setenv("PAAS_GITEA_URL", "https://git.example.com")
     monkeypatch.setenv("PAAS_GITEA_API_TOKEN", "tok-123")

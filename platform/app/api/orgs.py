@@ -8,9 +8,9 @@ from sqlalchemy.orm import Session
 from .. import audit
 from ..db import get_db
 from ..models import ApiKey, Organization, Project
-from ..schemas import OrgCreate, OrgOut
+from ..schemas import GiteaSyncResult, OrgCreate, OrgOut
 from ..security import require_admin, require_api_key
-from ..services import gitea
+from ..services import gitea, gitea_sync
 from ..services.gitea import GiteaError, GiteaNotConfigured
 
 router = APIRouter(prefix="/orgs", tags=["organizations"])
@@ -50,3 +50,21 @@ def list_orgs(db: Session = Depends(get_db), _: ApiKey = Depends(require_api_key
         OrgOut(id=org.id, name=org.name, created_at=org.created_at, project_count=count)
         for org, count in rows
     ]
+
+
+@router.post("/sync", response_model=GiteaSyncResult)
+def sync_from_gitea(db: Session = Depends(get_db), admin: ApiKey = Depends(require_admin)):
+    """Gitea 기준으로 플랫폼 DB에 없는 조직/리포를 가져온다(Gitea → 플랫폼 한 방향).
+    관리자가 필요할 때 수동으로 트리거한다 — 자동/주기 실행은 하지 않는다."""
+    try:
+        result = gitea_sync.sync_from_gitea(db)
+    except GiteaNotConfigured as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except GiteaError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    audit.record(db, admin.name, "orgs.sync_from_gitea", "-", {
+        "orgs_created": len(result["orgs_created"]),
+        "projects_created": len(result["projects_created"]),
+        "skipped": len(result["skipped"]),
+    })
+    return result
