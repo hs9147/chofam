@@ -238,6 +238,16 @@ class ComponentStatus(BaseModel):
     internal_port: int | None = None
 
 
+class RedirectRuleSummary(BaseModel):
+    """서버구성/배포구조 시각화에 얹는 URL redirect·rewrite 규칙 요약(id·project_id
+    없이 규칙 내용만) — RedirectRuleOut의 경량판."""
+
+    from_path: str
+    to_path: str
+    kind: RedirectKind
+    status_code: int
+
+
 class ServerConfigSite(BaseModel):
     project_id: int
     project_name: str
@@ -246,6 +256,7 @@ class ServerConfigSite(BaseModel):
     path_prefix: str
     status: str
     redirect_count: int
+    redirects: list[RedirectRuleSummary]
     # composite 프로젝트만 채워짐(backend/frontend 개별 상태) — 일반 프로젝트는 None.
     components: list[ComponentStatus] | None = None
 

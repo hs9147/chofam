@@ -122,6 +122,25 @@ PR 프리뷰(`{project}-pv{id}.deploy.example.com`)처럼 여전히 서브도메
 > macOS는 Colima(무료) 권장·GPU 불가 — [platform/README.md의 "설치 빌드옵션"](../platform/README.md) 참고.
 > **Windows는 3.6절**에 별도 절차가 있다.
 
+**방화벽 — 외부에는 80/443만 열 것.** 기업 네트워크는 보통 80/443 외 포트의 인바운드를
+차단한다. 이 플랫폼은 그 전제로 설계돼 있다 — 모든 프로젝트는 실제로는 서로 다른
+내부 포트(`PAAS_PORT_RANGE_START`~`PAAS_PORT_RANGE_END`, 기본 8100-8999)에서 뜨지만,
+외부에서는 리버스 프록시(Caddy/IIS/Apache) 하나가 받는 80/443 위에서 경로별로
+알아서 알맞은 내부 포트로 라우팅(URL rewrite)한다 — 프로젝트별 배포 URL과 포트를
+항상 단일 외부 포트로 대응시키는 것이 이 프록시 계층의 존재 이유다. 따라서:
+
+- 서버(또는 클라우드 보안 그룹) 방화벽은 80/443만 인바운드 허용하고, `port_range`
+  대역은 외부에서 닫아둔다.
+- Docker(`DockerRuntime`)는 이제 `host_port`를 `127.0.0.1`에만 publish하도록
+  코드로 강제한다(`services/runtime/docker_runtime.py`) — 방화벽 설정을 깜빡해도
+  컨테이너가 외부에 직접 노출되지 않는다.
+- `windows_service` 런타임(3.6절, Docker 없는 네이티브 프로세스 실행)은 컨테이너
+  격리가 없어 플랫폼이 바인드 주소를 강제할 수 없다 — `PORT`와 함께 `HOST=127.0.0.1`도
+  넘겨주지만 앱이 이를 지킬지는 앱 구현에 달려 있으므로, 이 런타임을 쓸 때는 반드시
+  Windows 방화벽으로 `port_range` 대역의 외부 인바운드를 차단할 것.
+- Kubernetes(엔터프라이즈 티어, 3.9절)는 Service가 항상 `ClusterIP`이고 Ingress
+  컨트롤러 하나만 외부에 노출되므로 이 항목은 해당 없음(NodePort류 사용 안 함).
+
 ### 3.2 플랫폼 설치 (환경설정)
 
 ```bash
@@ -358,6 +377,11 @@ npm run build
   `C:\Windows\System32\inetsrv\appcmd.exe` — 표준 설치 경로면 그대로 둘 것)다. IIS
   프로세스(앱풀 계정)가 `PAAS_IIS_SITES_ROOT` 폴더에 읽기 권한을 가져야 한다.
 - 서비스 등록(부팅 시 자동 시작): [NSSM](https://nssm.cc)으로 uvicorn·caddy를 Windows 서비스로 등록.
+- **방화벽(외부에는 80/443만).** `PAAS_PORT_RANGE_START`~`PAAS_PORT_RANGE_END`(기본
+  8100-8999) 대역은 배포된 프로젝트가 뜨는 내부 포트다 — Windows Defender 방화벽에서
+  이 대역의 외부 인바운드를 반드시 차단할 것(3.1절 "방화벽" 참고). `windows_service`
+  런타임(Docker 미설치 환경의 네이티브 프로세스 실행, `PAAS_RUNTIME_BACKEND=windows_service`)은
+  컨테이너 격리가 없어 앱이 `0.0.0.0`에 바인드하면 그대로 외부에 노출되므로 특히 중요하다.
 - 한글 등 파일 인코딩은 플랫폼 코드가 UTF-8을 명시해 처리한다 — Windows CI에서 전 테스트 통과 확인됨.
 - 팀 규모가 크면 Docker Desktop 라이선스(기업 유료)를 확인할 것 — 부담되면 A(WSL2 + Docker Engine) 방식이 무료.
 

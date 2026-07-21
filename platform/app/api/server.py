@@ -5,8 +5,10 @@
 시각화" + "메뉴(라우팅/사이트 항목) 관리" 요건. redirect/rewrite 규칙은 다음
 배포/롤백 때 프록시 설정에 반영된다(services/deployer.py의 redirects_for 참고).
 """
+from collections import defaultdict
+
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .. import audit
@@ -17,7 +19,8 @@ from ..models import (
     RedirectKind, RedirectRule,
 )
 from ..schemas import (
-    ComponentStatus, RedirectRuleCreate, RedirectRuleOut, ServerConfigOut, ServerConfigSite,
+    ComponentStatus, RedirectRuleCreate, RedirectRuleOut, RedirectRuleSummary,
+    ServerConfigOut, ServerConfigSite,
 )
 from ..security import require_api_key
 from ..services import deployer
@@ -32,12 +35,9 @@ def server_config(db: Session = Depends(get_db), _: ApiKey = Depends(require_api
     settings = get_settings()
     runtime = deployer.get_runtime()
     projects = db.execute(select(Project).order_by(Project.id)).scalars().all()
-    counts = dict(
-        db.execute(
-            select(RedirectRule.project_id, func.count(RedirectRule.id))
-            .group_by(RedirectRule.project_id)
-        ).all()
-    )
+    rules_by_project: dict[int, list[RedirectRule]] = defaultdict(list)
+    for rule in db.execute(select(RedirectRule).order_by(RedirectRule.id)).scalars():
+        rules_by_project[rule.project_id].append(rule)
     # composite 컴포넌트의 내부 포트 — 롤백 없이도 마지막으로 running이었던 값을 보여준다
     ports = {
         (project_id, profile, component): port
@@ -77,6 +77,7 @@ def server_config(db: Session = Depends(get_db), _: ApiKey = Depends(require_api
                 except Exception as e:  # noqa: BLE001 — 런타임 미설치/미접근이 전체 화면을 막지 않게
                     status = f"unknown ({e})"
             org_name = p.organization.name if p.organization else None
+            project_rules = rules_by_project.get(p.id, [])
             sites.append(ServerConfigSite(
                 project_id=p.id,
                 project_name=p.name,
@@ -84,7 +85,14 @@ def server_config(db: Session = Depends(get_db), _: ApiKey = Depends(require_api
                 domain=domain_for(p.name, p.domain, profile),
                 path_prefix=path_prefix_for(org_name, p.name, p.domain, profile),
                 status=status,
-                redirect_count=counts.get(p.id, 0),
+                redirect_count=len(project_rules),
+                redirects=[
+                    RedirectRuleSummary(
+                        from_path=r.from_path, to_path=r.to_path,
+                        kind=r.kind, status_code=r.status_code,
+                    )
+                    for r in project_rules
+                ],
                 components=components,
             ))
     return ServerConfigOut(

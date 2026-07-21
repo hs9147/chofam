@@ -1,4 +1,4 @@
-import type { ComponentStatus, ServerConfigOut, ServerConfigSite } from '../lib/types';
+import type { ComponentStatus, RedirectRuleSummary, ServerConfigOut, ServerConfigSite } from '../lib/types';
 
 // StatusPill의 CLASS_MAP과 동일한 상태→색상 분류를 SVG stroke/fill에 맞게 재사용한다.
 const STATUS_CLASS: Record<string, string> = {
@@ -88,6 +88,10 @@ export default function TopologyDiagram({ cfg }: { cfg: ServerConfigOut }) {
             <span className="mutedtext" style={{ fontSize: 11 }}>{s}</span>
           </span>
         ))}
+        <span className="row" style={{ gap: 4 }}>
+          <span className="topo-dot" style={{ background: 'var(--accent)' }} />
+          <span className="mutedtext" style={{ fontSize: 11 }}>숫자 배지 = redirect/rewrite 규칙 수(마우스 올리면 상세)</span>
+        </span>
       </div>
     </div>
   );
@@ -106,6 +110,25 @@ function TopoBox({
   );
 }
 
+function redirectTooltip(redirects: RedirectRuleSummary[]): string {
+  return redirects
+    .map((r) => `${r.from_path} → ${r.to_path} (${r.kind}${r.kind === 'redirect' ? ' ' + r.status_code : ''})`)
+    .join('\n');
+}
+
+// URL redirect/rewrite 규칙이 있는 사이트의 우상단에 개수 배지를 얹는다 — hover 시
+// SVG 네이티브 <title> 툴팁으로 실제 규칙(from → to)을 보여준다(별도 의존성 없음).
+function RedirectBadge({ x, y, redirects }: { x: number; y: number; redirects: RedirectRuleSummary[] }) {
+  if (redirects.length === 0) return null;
+  return (
+    <g>
+      <circle cx={x} cy={y} r={9} className="topo-redirect-badge" />
+      <text x={x} y={y + 3} className="topo-redirect-badge-text">{redirects.length}</text>
+      <title>{redirectTooltip(redirects)}</title>
+    </g>
+  );
+}
+
 function SiteNode({ x, site }: { x: number; site: ServerConfigSite }) {
   if (site.components && site.components.length > 0) {
     return (
@@ -114,6 +137,7 @@ function SiteNode({ x, site }: { x: number; site: ServerConfigSite }) {
         <text x={x + NODE_W / 2} y={SITE_Y + 16} textAnchor="middle" className="topo-label-title">
           {site.project_name}
         </text>
+        <RedirectBadge x={x + NODE_W - 12} y={SITE_Y + 12} redirects={site.redirects} />
         {site.components.map((c: ComponentStatus, idx) => {
           const cy = SITE_Y + 22 + idx * (SUB_H + 4);
           const route = c.name === 'backend' ? '/api/*' : '/*';
@@ -144,6 +168,7 @@ function SiteNode({ x, site }: { x: number; site: ServerConfigSite }) {
       <text x={x + NODE_W / 2} y={SITE_Y + 16} textAnchor="middle" className="topo-label-title">
         {site.project_name}
       </text>
+      <RedirectBadge x={x + NODE_W - 12} y={SITE_Y + 12} redirects={site.redirects} />
       <text
         x={x + NODE_W / 2} y={SITE_Y + 32} textAnchor="middle"
         className="topo-sublabel" style={{ fill: CLASS_FILL[statusClass(site.status)] }}

@@ -39,6 +39,7 @@ def test_server_config_defaults(monkeypatch, fresh_settings):
     assert release["path_prefix"] == "/apps/_/shop-web/"  # organization_id 없는 프로젝트 — 조직 자리는 "_"
     assert release["status"] == "running"
     assert release["redirect_count"] == 0
+    assert release["redirects"] == []
 
 
 def test_server_config_path_prefix_uses_organization_name(monkeypatch, fresh_settings):
@@ -149,9 +150,22 @@ def test_redirect_crud_flow(fresh_settings):
     server_cfg = c.get("/paas/api/v1/server-config", headers=ADMIN).json()
     release = next(s for s in server_cfg["sites"] if s["project_id"] == pid and s["profile"] == "release")
     assert release["redirect_count"] == 1
+    assert release["redirects"] == [
+        {"from_path": "/old", "to_path": "/new", "kind": "redirect", "status_code": 301},
+    ]
+    # 프로필과 무관하게 동일 규칙이 반영된다(RedirectRule은 profile로 구분되지 않음)
+    dev = next(s for s in server_cfg["sites"] if s["project_id"] == pid and s["profile"] == "development")
+    assert dev["redirects"] == release["redirects"]
 
     assert c.delete(f"/paas/api/v1/redirects/{rule['id']}", headers=ADMIN).status_code == 204
     assert c.get(f"/paas/api/v1/projects/{pid}/redirects", headers=ADMIN).json() == []
+
+    server_cfg_after = c.get("/paas/api/v1/server-config", headers=ADMIN).json()
+    release_after = next(
+        s for s in server_cfg_after["sites"] if s["project_id"] == pid and s["profile"] == "release"
+    )
+    assert release_after["redirect_count"] == 0
+    assert release_after["redirects"] == []
 
 
 def test_redirect_defaults_kind_and_status(fresh_settings):

@@ -183,6 +183,13 @@ export interface ComponentStatus {
   internal_port: number | null;
 }
 
+export interface RedirectRuleSummary {
+  from_path: string;
+  to_path: string;
+  kind: 'redirect' | 'rewrite';
+  status_code: number;
+}
+
 // 서버구성 시각화 — 런타임/프록시 백엔드 + 등록된 사이트(라우팅 항목) 목록
 export interface ServerConfigSite {
   project_id: number;
@@ -192,6 +199,7 @@ export interface ServerConfigSite {
   path_prefix: string;
   status: string;
   redirect_count: number;
+  redirects: RedirectRuleSummary[];
   // composite 프로젝트만 채워짐 — 일반 프로젝트는 null
   components: ComponentStatus[] | null;
 }
