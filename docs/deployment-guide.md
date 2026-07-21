@@ -385,6 +385,12 @@ npm run build
   `appcmd.exe` 경로가 `PAAS_IIS_APPCMD_PATH`(기본
   `C:\Windows\System32\inetsrv\appcmd.exe` — 표준 설치 경로면 그대로 둘 것)다. IIS
   프로세스(앱풀 계정)가 `PAAS_IIS_SITES_ROOT` 폴더에 읽기 권한을 가져야 한다.
+  **이미 운영 중인 IIS 사이트에 붙이는 경우**(도메인 이름 그대로 쓰는 커스텀 도메인
+  release 배포)에도 안전하다 — 플랫폼은 그 사이트의 `web.config`를 통째로 덮어쓰지
+  않고, `<!-- paas:managed:begin/end -->` 마커 사이의 규칙만 갈아끼운다. 마커 밖에
+  있는 기존 규칙·다른 IIS 기능 설정은 그대로 남고, 배포를 반복해도(같은 배포 상태를
+  다시 넣으면) 항상 같은 결과를 낸다(`services/proxy/iis_proxy.py`의
+  `_splice_managed_rules`).
 - 서비스 등록(부팅 시 자동 시작): [NSSM](https://nssm.cc)으로 uvicorn·caddy를 Windows 서비스로 등록.
 - **방화벽(외부에는 80/443만).** `PAAS_PORT_RANGE_START`~`PAAS_PORT_RANGE_END`(기본
   8100-8999) 대역은 배포된 프로젝트가 뜨는 내부 포트다 — Windows Defender 방화벽에서
