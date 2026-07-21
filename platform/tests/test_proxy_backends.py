@@ -157,9 +157,206 @@ def test_iis_configure_dedicated_domain_writes_own_site(monkeypatch, tmp_path, f
     assert 'action type="Rewrite" url="/v2/internal"' in web_config
     assert "http://127.0.0.1:8123/{R:1}" in web_config
 
-    assert calls[0][1:3] == ["delete", "site"]
-    assert calls[1][1:3] == ["add", "site"]
-    assert any("/bindings:http/*:80:shop.example.com" in a for a in calls[1])
+    # ARR(Application Request Routing) 프록시 기능이 사이트 생성 전에 켜져야 한다 —
+    # URL Rewrite만으로는 절대 URL(http://127.0.0.1:{port}/...) target을 실제로 전달 못 함.
+    assert calls[0][1:3] == ["set", "config"]
+    assert calls[1][1:3] == ["delete", "site"]
+    assert calls[2][1:3] == ["add", "site"]
+    assert any("/bindings:http/*:80:shop.example.com" in a for a in calls[2])
+
+
+def test_iis_configure_raises_clear_error_when_arr_not_installed(monkeypatch, tmp_path, fresh_settings):
+    """ARR 미설치 시 URL Rewrite 규칙은 매칭되지만 응답이 안 오는(502/무응답) 상태로
+    조용히 배포가 "성공"하면 안 된다 — appcmd가 실패하면 바로 명확한 에러로 드러난다."""
+    monkeypatch.setenv("PAAS_IIS_SITES_ROOT", str(tmp_path / "sites"))
+    monkeypatch.setenv("PAAS_IIS_APPCMD_PATH", "appcmd.exe")
+    get_settings.cache_clear()
+
+    def fake_run(args, **kw):
+        if args[1:3] == ["set", "config"]:
+            return _Fail()
+        return _Ok()
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    try:
+        IISProxy().configure("shop", BuildProfile.release, "shop.example.com", "/", ENDPOINT, [])
+        raised = False
+    except Exception as e:
+        raised = True
+        assert "ARR" in str(e)
+    assert raised
+
+
+def test_iis_configure_dedicated_preserves_foreign_web_config_content(monkeypatch, tmp_path, fresh_settings):
+    """운영자가 미리 만들어 둔(플랫폼이 모르는 규칙·설정이 든) web.config가 있어도
+    플랫폼은 자기 관리 블록(paas:managed 마커 사이)만 갈아끼우고 나머지는 그대로 둔다."""
+    monkeypatch.setenv("PAAS_IIS_SITES_ROOT", str(tmp_path / "sites"))
+    monkeypatch.setenv("PAAS_IIS_APPCMD_PATH", "appcmd.exe")
+    get_settings.cache_clear()
+    monkeypatch.setattr(subprocess, "run", lambda *a, **kw: _Ok())
+
+    site_dir = tmp_path / "sites" / "shop"
+    site_dir.mkdir(parents=True)
+    (site_dir / "web.config").write_text(
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        "<configuration>\n"
+        "  <system.webServer>\n"
+        "    <staticContent>\n"
+        '      <mimeMap fileExtension=".foo" mimeType="text/plain" />\n'
+        "    </staticContent>\n"
+        "    <rewrite>\n"
+        "      <rules>\n"
+        '        <rule name="legacy-admin-only" stopProcessing="true">\n'
+        '          <match url="^admin/(.*)" />\n'
+        '          <action type="CustomResponse" statusCode="403" />\n'
+        "        </rule>\n"
+        "      </rules>\n"
+        "    </rewrite>\n"
+        "  </system.webServer>\n"
+        "</configuration>\n",
+        encoding="utf-8",
+    )
+
+    IISProxy().configure("shop", BuildProfile.release, "shop.example.com", "/", ENDPOINT, [])
+
+    web_config = (site_dir / "web.config").read_text(encoding="utf-8")
+    assert '<mimeMap fileExtension=".foo" mimeType="text/plain" />' in web_config
+    assert 'name="legacy-admin-only"' in web_config
+    assert "<!-- paas:managed:begin -->" in web_config
+    assert "<!-- paas:managed:end -->" in web_config
+    assert "http://127.0.0.1:8123/{R:1}" in web_config
+    # 기존 규칙이 플랫폼 블록보다 먼저 와야(우선순위 보존) 한다
+    assert web_config.index('name="legacy-admin-only"') < web_config.index("paas:managed:begin")
+
+
+def test_iis_configure_dedicated_same_input_gives_same_output(monkeypatch, tmp_path, fresh_settings):
+    """같은 배포 상태를 다시 넣으면 항상 같은 바이트를 낸다(결정적·멱등) —
+    관리 블록을 매번 찾아서 갈아끼우므로 재실행해도 파일이 계속 자라지 않는다."""
+    monkeypatch.setenv("PAAS_IIS_SITES_ROOT", str(tmp_path / "sites"))
+    monkeypatch.setenv("PAAS_IIS_APPCMD_PATH", "appcmd.exe")
+    get_settings.cache_clear()
+    monkeypatch.setattr(subprocess, "run", lambda *a, **kw: _Ok())
+
+    IISProxy().configure("shop", BuildProfile.release, "shop.example.com", "/", ENDPOINT, REDIRECTS)
+    first = (tmp_path / "sites" / "shop" / "web.config").read_text(encoding="utf-8")
+
+    IISProxy().configure("shop", BuildProfile.release, "shop.example.com", "/", ENDPOINT, REDIRECTS)
+    second = (tmp_path / "sites" / "shop" / "web.config").read_text(encoding="utf-8")
+
+    assert first == second
+
+
+def test_iis_regenerate_base_preserves_foreign_web_config_content(monkeypatch, tmp_path, fresh_settings):
+    """공유(_base) 사이트도 마찬가지 — 조각 파일 재합성이 기존 파일을 통째로
+    덮어쓰지 않고 관리 블록만 갈아끼운다."""
+    monkeypatch.setenv("PAAS_IIS_SITES_ROOT", str(tmp_path / "sites"))
+    monkeypatch.setenv("PAAS_IIS_APPCMD_PATH", "appcmd.exe")
+    monkeypatch.setenv("PAAS_BASE_DOMAIN", "apps.test")
+    get_settings.cache_clear()
+    monkeypatch.setattr(subprocess, "run", lambda *a, **kw: _Ok())
+
+    base_dir = tmp_path / "sites" / "_base"
+    base_dir.mkdir(parents=True)
+    (base_dir / "web.config").write_text(
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        "<configuration>\n"
+        "  <system.webServer>\n"
+        '    <httpErrors errorMode="Custom" />\n'
+        "    <rewrite>\n"
+        "      <rules>\n"
+        '        <rule name="hand-written" />\n'
+        "      </rules>\n"
+        "    </rewrite>\n"
+        "  </system.webServer>\n"
+        "</configuration>\n",
+        encoding="utf-8",
+    )
+
+    IISProxy().configure("shop", BuildProfile.release, "apps.test", "/acme/shop/", ENDPOINT, [])
+
+    web_config = (base_dir / "web.config").read_text(encoding="utf-8")
+    assert 'errorMode="Custom"' in web_config
+    assert 'name="hand-written"' in web_config
+    assert "paas:managed:begin" in web_config
+    assert "acme/shop" in web_config
+
+
+def test_iis_splice_creates_missing_rewrite_and_rules_containers():
+    """<rewrite>/<rules>가 아직 없어도(예: <system.webServer>만 있는 파일) 있는
+    구조만 감싸서 새로 만들고, 재실행하면 마커를 찾아 멱등하게 갈아끼운다."""
+    from app.services.proxy.iis_proxy import _splice_managed_rules
+
+    existing = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        "<configuration>\n"
+        "  <system.webServer>\n"
+        '    <httpErrors errorMode="Custom" />\n'
+        "  </system.webServer>\n"
+        "</configuration>\n"
+    )
+    result = _splice_managed_rules(existing, '<rule name="x" />\n')
+    assert '<httpErrors errorMode="Custom" />' in result
+    assert "<rewrite>" in result and "<rules>" in result
+    assert 'name="x"' in result
+
+    result2 = _splice_managed_rules(result, '<rule name="x" />\n')
+    assert result == result2
+
+
+def test_iis_splice_builds_full_structure_from_bare_configuration():
+    from app.services.proxy.iis_proxy import _SKELETON, _splice_managed_rules
+
+    result = _splice_managed_rules(_SKELETON, '<rule name="x" />\n')
+    assert "<system.webServer>" in result and "<rewrite>" in result and "<rules>" in result
+    assert 'name="x"' in result
+
+
+def test_iis_splice_raises_on_malformed_config_without_configuration_element():
+    from app.services.proxy.iis_proxy import _splice_managed_rules
+
+    try:
+        _splice_managed_rules("not xml at all", "<rule />\n")
+        raised = False
+    except Exception:
+        raised = True
+    assert raised
+
+
+def test_iis_remove_shrinks_managed_block_without_touching_foreign_content(monkeypatch, tmp_path, fresh_settings):
+    """배포 제거(remove)도 관리 블록만 다시 계산해서 갈아끼운다 — 플랫폼이 모르는
+    기존 규칙은 추가 때와 마찬가지로 그대로 남는다."""
+    monkeypatch.setenv("PAAS_IIS_SITES_ROOT", str(tmp_path / "sites"))
+    monkeypatch.setenv("PAAS_IIS_APPCMD_PATH", "appcmd.exe")
+    monkeypatch.setenv("PAAS_BASE_DOMAIN", "apps.test")
+    get_settings.cache_clear()
+    monkeypatch.setattr(subprocess, "run", lambda *a, **kw: _Ok())
+
+    base_dir = tmp_path / "sites" / "_base"
+    base_dir.mkdir(parents=True)
+    (base_dir / "web.config").write_text(
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        "<configuration>\n"
+        "  <system.webServer>\n"
+        '    <httpErrors errorMode="Custom" />\n'
+        "    <rewrite>\n"
+        "      <rules>\n"
+        '        <rule name="hand-written" />\n'
+        "      </rules>\n"
+        "    </rewrite>\n"
+        "  </system.webServer>\n"
+        "</configuration>\n",
+        encoding="utf-8",
+    )
+
+    IISProxy().configure("shop", BuildProfile.release, "apps.test", "/acme/shop/", ENDPOINT, [])
+    after_add = (base_dir / "web.config").read_text(encoding="utf-8")
+    assert "acme/shop" in after_add
+
+    IISProxy().remove("shop", BuildProfile.release)
+    after_remove = (base_dir / "web.config").read_text(encoding="utf-8")
+    assert "acme/shop" not in after_remove
+    assert 'errorMode="Custom"' in after_remove
+    assert 'name="hand-written"' in after_remove
 
 
 def test_iis_configure_raises_on_add_failure(monkeypatch, tmp_path, fresh_settings):
