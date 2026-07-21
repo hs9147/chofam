@@ -3,7 +3,7 @@ from sqlalchemy import select
 
 from app.db import SessionLocal
 from app.main import create_app
-from app.models import BuildProfile, Deployment, Project, ProjectType
+from app.models import BuildProfile, Deployment, Organization, Project, ProjectType
 from app.services import deployer, self_deploy
 
 
@@ -63,6 +63,9 @@ def test_creates_project_and_triggers_deploy_once(monkeypatch, fresh_settings):
         assert project.source_subdir == self_deploy.SELF_CONSOLE_SUBDIR
         assert project.git_url == "https://git.example.com/hs9147/chofam"
         assert project.branch == "main"
+        assert project.organization_id is not None
+        org = db.get(Organization, project.organization_id)
+        assert org.name == self_deploy.SELF_DEPLOY_ORG_NAME  # "admin" — /apps/admin/paas-console/
     assert calls == [(self_deploy.SELF_CONSOLE_PROJECT_NAME, BuildProfile.release)]
     # 재배포 skip(idempotent) 동작은 test_second_bootstrap_call_skips_redeploy에서
     # 실제 deploy_queued(Deployment 행을 동기 생성)를 통해 검증한다 — 여기서 쓴

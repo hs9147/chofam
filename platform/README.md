@@ -114,9 +114,10 @@ docker compose up -d --build
 ### 콘솔 자기 배포 (옵트인)
 
 `PAAS_SELF_DEPLOY_CONSOLE=true`면 위 정적 마운트 대신, 백엔드가 기동할 때 콘솔을
-`paas-console`이라는 일반 `react` Project(`source_subdir=platform/console`)로 등록해
-플랫폼 자신의 배포 파이프라인(build_image → DockerRuntime → 리버스프록시)으로
-띄웁니다 — `services/self_deploy.py`. 최초 1회만 자동 배포하며, 상세 설정은
+`admin` 조직 소속 `paas-console`이라는 일반 `react` Project(`source_subdir=platform/console`)로
+등록해 플랫폼 자신의 배포 파이프라인(build_image → DockerRuntime → 리버스프록시)으로
+띄웁니다 — `services/self_deploy.py`. `https://{base_domain}/apps/admin/paas-console/`에서
+접속하며, 최초 1회만 자동 배포합니다. 상세 설정은
 [docs/deployment-guide.md §3.2c](../docs/deployment-guide.md#32c-콘솔을-배포-파이프라인으로-자기-배포-옵트인) 참고.
 
 ## API 요약 (인증: `x-api-key` 헤더)
