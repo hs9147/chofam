@@ -27,8 +27,32 @@ def test_extract_diff_unfenced():
 
 
 def test_resolve_internal_project_url():
-    assert llm.resolve_base_url("project://llm-main") == "http://llm-main.apps.test"
+    """db 없이 호출하면(조직 조회 불가) 서브패스 조직 자리가 "_"로 안전하게 떨어진다."""
+    assert llm.resolve_base_url("project://llm-main") == "http://apps.test/_/llm-main/"
     assert llm.resolve_base_url("https://api.anthropic.com/") == "https://api.anthropic.com"
+
+
+def test_resolve_internal_project_url_uses_target_organization():
+    """db가 주어지면 project:// 대상의 실제 조직으로 서브패스를 구성한다 — 실제
+    배포 URL(services/deployer.py)과 정확히 일치해야 한다."""
+    from app.db import Base, engine
+    from app.models import Organization, Project, ProjectType
+    from sqlalchemy.orm import Session as ORMSession
+
+    Base.metadata.create_all(engine)
+    with ORMSession(engine) as db:
+        org = Organization(name="research")
+        db.add(org)
+        db.commit()
+        db.add(Project(name="llm-main", type=ProjectType.llm,
+                        organization_id=org.id, git_url="https://git.example.com/x"))
+        db.commit()
+
+        assert llm.resolve_base_url("project://llm-main", db) == "http://apps.test/research/llm-main/"
+
+        db.query(Project).delete()
+        db.query(Organization).delete()
+        db.commit()
 
 
 def test_review_parsing(monkeypatch):

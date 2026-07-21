@@ -35,14 +35,14 @@ export default function Organizations() {
       </p>
       <form onSubmit={submit} style={{ marginBottom: 16 }}>
         <label className="field" style={{ display: 'inline-flex', marginRight: 10 }}>
-          조직 이름 — 빈칸 없이 소문자·숫자·하이픈만 사용하세요 (예: shop-team)
+          조직 이름 — 빈칸 없이 소문자·숫자·하이픈만 사용하세요 (예: portal-team)
           <div className="row">
             <input
-              placeholder="shop-team"
+              placeholder="portal-team"
               value={name}
               onChange={(e) => setName(e.target.value)}
               pattern="[a-z0-9][a-z0-9-]{1,40}"
-              title="빈칸 없이 소문자·숫자·하이픈만 사용하세요 (예: shop-team)"
+              title="빈칸 없이 소문자·숫자·하이픈만 사용하세요 (예: portal-team)"
               required
               style={{ width: 240 }}
             />

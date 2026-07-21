@@ -2,7 +2,9 @@
 
 주입 규약 (env_prefix = "PAY" 예시):
   external_api : PAY_URL, PAY_API_KEY
-  internal_api : PAY_URL  (1차: http://{target}.{base_domain}, 2차: http://paas-{target}.{ns}.svc)
+  internal_api : PAY_URL  (1차: https://{base_domain}/{조직 또는 "_"}/{target}/ — target
+                 프로젝트의 실제 배포 URL과 동일한 규칙, path_prefix_for 참고.
+                 2차: http://paas-{target}.{ns}.svc)
   database     : PAY_DSN
   file_storage : PAY_ENDPOINT, PAY_BUCKET
 """
@@ -10,7 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..config import Settings, get_settings
-from ..models import Module, ModuleBinding, ModuleType, Project
+from ..models import BuildProfile, Module, ModuleBinding, ModuleType, Project
 from ..security import decrypt_value, encrypt_value
 
 # config 안에서 저장 시 암호화되는 필드
@@ -41,7 +43,9 @@ def masked_config(config: dict) -> dict:
     return {k: ("•••" if isinstance(v, dict) and "__enc__" in v else v) for k, v in config.items()}
 
 
-def binding_env(module: Module, env_prefix: str, settings: Settings | None = None) -> dict[str, str]:
+def binding_env(
+    module: Module, env_prefix: str, settings: Settings | None = None, db: Session | None = None,
+) -> dict[str, str]:
     settings = settings or get_settings()
     cfg = decrypt_config(module.config or {})
     p = env_prefix.upper()
@@ -58,7 +62,17 @@ def binding_env(module: Module, env_prefix: str, settings: Settings | None = Non
         if settings.tier == "enterprise":
             url = f"http://paas-{target}.{settings.k8s_namespace}.svc"
         else:
-            url = f"https://{target}.{settings.base_domain}"
+            from . import proxy  # noqa: PLC0415 — 순환 import 회피
+
+            org_name = None
+            if db is not None:
+                target_project = db.execute(
+                    select(Project).where(Project.name == target)
+                ).scalar_one_or_none()
+                if target_project is not None and target_project.organization is not None:
+                    org_name = target_project.organization.name
+            path = proxy.path_prefix_for(org_name, target, None, BuildProfile.release)
+            url = f"https://{settings.base_domain}{path}"
         return {f"{p}_URL": url}
 
     if t == ModuleType.database:
@@ -81,7 +95,7 @@ def env_for_project(db: Session, project: Project) -> dict[str, str]:
     ).all()
     env: dict[str, str] = {}
     for binding, module in rows:
-        env.update(binding_env(module, binding.env_prefix))
+        env.update(binding_env(module, binding.env_prefix, db=db))
     return env
 
 
@@ -119,6 +133,6 @@ def context_for_llm(db: Session, project: Project) -> list[dict]:
         summary.append({
             "name": module.name,
             "type": module.type.value,
-            "env": sorted(binding_env(module, binding.env_prefix).keys()),
+            "env": sorted(binding_env(module, binding.env_prefix, db=db).keys()),
         })
     return summary

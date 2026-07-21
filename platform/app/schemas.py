@@ -229,6 +229,7 @@ class ServerConfigSite(BaseModel):
     project_name: str
     profile: BuildProfile
     domain: str
+    path_prefix: str
     status: str
     redirect_count: int
     # composite 프로젝트만 채워짐(backend/frontend 개별 상태) — 일반 프로젝트는 None.

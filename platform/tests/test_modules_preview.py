@@ -30,9 +30,11 @@ def test_database_env_encrypted_dsn():
 
 
 def test_internal_api_env_resolves_by_tier():
+    """1차(small)는 target 프로젝트의 실제 배포 URL과 동일한 서브패스 규칙을 쓴다
+    (db 없이 호출하면 조직을 알 수 없으니 "_" 자리로 안전하게 떨어진다)."""
     m = _module(ModuleType.internal_api, {"target_project": "mail-api"})
     small = svc.binding_env(m, "MAIL")
-    assert small == {"MAIL_URL": "https://mail-api.apps.test"}
+    assert small == {"MAIL_URL": "https://apps.test/_/mail-api/"}
 
     from app.config import get_settings
     enterprise = get_settings().model_copy(
@@ -40,6 +42,31 @@ def test_internal_api_env_resolves_by_tier():
     )
     ent = svc.binding_env(m, "MAIL", settings=enterprise)
     assert ent == {"MAIL_URL": "http://paas-mail-api.paas-apps.svc"}
+
+
+def test_internal_api_env_uses_target_projects_organization(fresh_settings):
+    """db가 주어지면 target_project를 조회해 그 프로젝트의 실제 조직 이름으로
+    서브패스를 구성한다 — 실제 배포 URL(services/deployer.py)과 정확히 일치해야 한다."""
+    from app.db import Base, engine
+    from app.models import Organization, Project, ProjectType
+    from sqlalchemy.orm import Session
+
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        org = Organization(name="acme")
+        db.add(org)
+        db.commit()
+        db.add(Project(name="mail-api", type=ProjectType.python,
+                        organization_id=org.id, git_url="https://git.example.com/x"))
+        db.commit()
+
+        m = _module(ModuleType.internal_api, {"target_project": "mail-api"})
+        env = svc.binding_env(m, "MAIL", db=db)
+        assert env == {"MAIL_URL": "https://apps.test/acme/mail-api/"}
+
+        db.query(Project).delete()
+        db.query(Organization).delete()
+        db.commit()
 
 
 def test_file_storage_env():

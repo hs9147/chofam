@@ -1,8 +1,9 @@
 """서버구성 시각화 + redirect/rewrite 규칙 CRUD."""
 from fastapi.testclient import TestClient
 
+from app.config import get_settings
 from app.main import create_app
-from app.services import deployer
+from app.services import deployer, gitea
 
 ADMIN = {"x-api-key": "test-admin-key"}
 
@@ -34,9 +35,35 @@ def test_server_config_defaults(monkeypatch, fresh_settings):
     profiles = {s["profile"] for s in body["sites"] if s["project_id"] == pid}
     assert profiles == {"release", "development"}
     release = next(s for s in body["sites"] if s["project_id"] == pid and s["profile"] == "release")
-    assert release["domain"] == "shop-web.apps.test"
+    assert release["domain"] == "apps.test"
+    assert release["path_prefix"] == "/_/shop-web/"  # organization_id 없는 프로젝트 — 조직 자리는 "_"
     assert release["status"] == "running"
     assert release["redirect_count"] == 0
+
+
+def test_server_config_path_prefix_uses_organization_name(monkeypatch, fresh_settings):
+    """조직 소속 프로젝트는 서브패스에 조직 이름이 들어간다 — /_/{project}/가 아니라
+    /{조직}/{프로젝트}/ (services/proxy/__init__.py의 path_prefix_for)."""
+    monkeypatch.setattr(deployer, "get_runtime", lambda: _FakeRuntime())
+    monkeypatch.setenv("PAAS_GITEA_URL", "https://git.example.com")
+    monkeypatch.setenv("PAAS_GITEA_API_TOKEN", "tok-123")
+    get_settings.cache_clear()
+    monkeypatch.setattr(gitea.httpx, "post", lambda url, **kw: type(
+        "R", (), {"status_code": 201, "text": "",
+                  "json": lambda self=None: {"clone_url": "https://git.example.com/acme/api.git"}}
+    )())
+
+    c = _client()
+    org_id = c.post("/paas/api/v1/orgs", json={"name": "acme"}, headers=ADMIN).json()["id"]
+    pid = c.post("/paas/api/v1/projects", json={
+        "name": "shop", "type": "react", "organization_id": org_id,
+    }, headers=ADMIN).json()["id"]
+
+    body = c.get("/paas/api/v1/server-config", headers=ADMIN).json()
+    release = next(s for s in body["sites"] if s["project_id"] == pid and s["profile"] == "release")
+    dev = next(s for s in body["sites"] if s["project_id"] == pid and s["profile"] == "development")
+    assert release["path_prefix"] == "/acme/shop/"
+    assert dev["path_prefix"] == "/acme/shop/dev/"
 
 
 def test_server_config_reflects_backend_settings(monkeypatch, fresh_settings):

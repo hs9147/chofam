@@ -146,7 +146,7 @@ async def post_message(
     messages.append({"role": "user", "content": body.content})
 
     try:
-        reply = await asyncio.to_thread(llm_service.chat_completion, provider, messages)
+        reply = await asyncio.to_thread(llm_service.chat_completion, provider, messages, db)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"llm call failed: {e}")
 
@@ -291,7 +291,7 @@ async def review_project(
         return {"findings": [], "max_severity": "none"}
 
     try:
-        findings = await asyncio.to_thread(llm_service.review_diff, provider, diff)
+        findings = await asyncio.to_thread(llm_service.review_diff, provider, diff, db)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"llm call failed: {e}")
     severity = llm_service.max_severity(findings)

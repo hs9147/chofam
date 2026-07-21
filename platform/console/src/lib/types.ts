@@ -175,6 +175,7 @@ export interface ServerConfigSite {
   project_name: string;
   profile: BuildProfile;
   domain: string;
+  path_prefix: string;
   status: string;
   redirect_count: number;
   // composite 프로젝트만 채워짐 — 일반 프로젝트는 null

@@ -17,7 +17,7 @@ from .caddy_proxy import CaddyProxy
 from .iis_proxy import IISProxy
 
 __all__ = [
-    "RedirectSpec", "ReverseProxy", "PathRoute", "get_proxy", "domain_for",
+    "RedirectSpec", "ReverseProxy", "PathRoute", "get_proxy", "domain_for", "path_prefix_for",
     "configure", "configure_paths", "remove",
 ]
 
@@ -32,23 +32,49 @@ def get_proxy() -> ReverseProxy:
 
 
 def domain_for(project_name: str, custom_domain: str | None, profile: BuildProfile) -> str:
-    """release는 지정 도메인(없으면 {name}.{base}), development는 항상 {name}-dev.{base}.
-    프록시 백엔드와 무관한 규칙이므로 여기서 공통으로 계산한다."""
+    """1차(small)의 배포 URL은 서브패스 기반이다 — 모든 프로젝트가 base_domain
+    하나를 공유하고 /{조직}/{프로젝트}/ 경로로 구분된다(path_prefix_for). 예외는
+    release 배포에 커스텀 도메인(project.domain)을 지정한 경우 — 그 도메인을
+    그대로 쓴다(development는 항상 공유 base_domain).
+
+    2차(enterprise/K8s)는 이 서브패스 라우팅 대상이 아니다 — Ingress 클래스마다
+    경로 스트리핑 방식이 달라(nginx rewrite-target, traefik Middleware 등) 일반화가
+    어렵고, 지금까지도 프로젝트당 서브도메인 1개로 잘 동작해왔다. 기존 방식 그대로
+    유지한다(k8s_runtime.py의 Ingress host/path는 이 값을 그대로 쓴다)."""
     settings = get_settings()
-    if profile == BuildProfile.development:
-        return f"{project_name}-dev.{settings.base_domain}"
-    return custom_domain or f"{project_name}.{settings.base_domain}"
+    if settings.tier == "enterprise":
+        if profile == BuildProfile.development:
+            return f"{project_name}-dev.{settings.base_domain}"
+        return custom_domain or f"{project_name}.{settings.base_domain}"
+    if profile == BuildProfile.release and custom_domain:
+        return custom_domain
+    return settings.base_domain
+
+
+def path_prefix_for(
+    org_name: str | None, project_name: str, custom_domain: str | None, profile: BuildProfile,
+) -> str:
+    """domain_for와 짝 — 2차(enterprise)와 release+커스텀 도메인 예외는 "/"(도메인
+    전체가 이 프로젝트 것), 그 외에는 /{조직 또는 "_"}/{프로젝트}/[dev/] 서브패스."""
+    settings = get_settings()
+    if settings.tier == "enterprise":
+        return "/"
+    if profile == BuildProfile.release and custom_domain:
+        return "/"
+    org_segment = org_name or "_"
+    dev_segment = "dev/" if profile == BuildProfile.development else ""
+    return f"/{org_segment}/{project_name}/{dev_segment}"
 
 
 def configure(
-    project_name: str, profile: BuildProfile, domain: str, endpoint: Endpoint,
+    project_name: str, profile: BuildProfile, domain: str, path_prefix: str, endpoint: Endpoint,
     redirects: list[RedirectRule] | list[RedirectSpec] | None = None,
 ) -> None:
     specs = [
         r if isinstance(r, RedirectSpec) else RedirectSpec.from_rule(r)
         for r in (redirects or [])
     ]
-    get_proxy().configure(project_name, profile, domain, endpoint, specs)
+    get_proxy().configure(project_name, profile, domain, path_prefix, endpoint, specs)
 
 
 def configure_paths(

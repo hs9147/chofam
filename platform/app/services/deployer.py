@@ -45,6 +45,10 @@ def get_runtime() -> Runtime:
     return DockerRuntime()
 
 
+def _org_name(project: Project) -> str | None:
+    return project.organization.name if project.organization else None
+
+
 def redirects_for(db: Session, project: Project) -> list[RedirectRule]:
     return list(
         db.execute(
@@ -149,8 +153,10 @@ def deploy_sync(
             spec = make_spec(db, project, result.image_tag, profile)
             endpoint = get_runtime().start(spec)
             if get_settings().tier == "small":
+                path_prefix = proxy.path_prefix_for(_org_name(project), project.name, project.domain, profile)
                 proxy.configure(
-                    project.name, profile, spec.domain, endpoint, redirects_for(db, project),
+                    project.name, profile, spec.domain, path_prefix, endpoint,
+                    redirects_for(db, project),
                 )
                 record.host_port = endpoint.port
 
@@ -292,8 +298,9 @@ def rollback(db: Session, project: Project, profile: BuildProfile) -> Deployment
     spec = make_spec(db, project, target.image_tag, profile)
     endpoint = get_runtime().start(spec)
     if get_settings().tier == "small":
+        path_prefix = proxy.path_prefix_for(_org_name(project), project.name, project.domain, profile)
         proxy.configure(
-            project.name, profile, spec.domain, endpoint, redirects_for(db, project),
+            project.name, profile, spec.domain, path_prefix, endpoint, redirects_for(db, project),
         )
 
     record = Deployment(
@@ -411,9 +418,12 @@ def deploy_composite_sync(
         if len(endpoints) == len(components):
             if get_settings().tier == "small":
                 domain = proxy.domain_for(project.name, project.domain, profile)
+                base_prefix = proxy.path_prefix_for(
+                    _org_name(project), project.name, project.domain, profile,
+                )
                 routes = [
-                    proxy.PathRoute(path_prefix="/api/", endpoint=endpoints["backend"]),
-                    proxy.PathRoute(path_prefix="/", endpoint=endpoints["frontend"]),
+                    proxy.PathRoute(path_prefix=base_prefix + "api/", endpoint=endpoints["backend"]),
+                    proxy.PathRoute(path_prefix=base_prefix, endpoint=endpoints["frontend"]),
                 ]
                 proxy.configure_paths(
                     project.name, profile, domain, routes, redirects_for(db, project),
@@ -538,9 +548,10 @@ def rollback_composite(db: Session, project: Project, profile: BuildProfile) -> 
 
     if get_settings().tier == "small":
         domain = proxy.domain_for(project.name, project.domain, profile)
+        base_prefix = proxy.path_prefix_for(_org_name(project), project.name, project.domain, profile)
         routes = [
-            proxy.PathRoute(path_prefix="/api/", endpoint=endpoints["backend"]),
-            proxy.PathRoute(path_prefix="/", endpoint=endpoints["frontend"]),
+            proxy.PathRoute(path_prefix=base_prefix + "api/", endpoint=endpoints["backend"]),
+            proxy.PathRoute(path_prefix=base_prefix, endpoint=endpoints["frontend"]),
         ]
         proxy.configure_paths(project.name, profile, domain, routes, redirects_for(db, project))
 
