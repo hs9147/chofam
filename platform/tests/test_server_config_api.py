@@ -36,7 +36,7 @@ def test_server_config_defaults(monkeypatch, fresh_settings):
     assert profiles == {"release", "development"}
     release = next(s for s in body["sites"] if s["project_id"] == pid and s["profile"] == "release")
     assert release["domain"] == "apps.test"
-    assert release["path_prefix"] == "/_/shop-web/"  # organization_id 없는 프로젝트 — 조직 자리는 "_"
+    assert release["path_prefix"] == "/apps/_/shop-web/"  # organization_id 없는 프로젝트 — 조직 자리는 "_"
     assert release["status"] == "running"
     assert release["redirect_count"] == 0
 
@@ -62,8 +62,8 @@ def test_server_config_path_prefix_uses_organization_name(monkeypatch, fresh_set
     body = c.get("/paas/api/v1/server-config", headers=ADMIN).json()
     release = next(s for s in body["sites"] if s["project_id"] == pid and s["profile"] == "release")
     dev = next(s for s in body["sites"] if s["project_id"] == pid and s["profile"] == "development")
-    assert release["path_prefix"] == "/acme/shop/"
-    assert dev["path_prefix"] == "/acme/shop/dev/"
+    assert release["path_prefix"] == "/apps/acme/shop/"
+    assert dev["path_prefix"] == "/apps/acme/shop/dev/"
 
 
 def test_server_config_reflects_backend_settings(monkeypatch, fresh_settings):

@@ -36,6 +36,20 @@ export interface OrgOut {
   project_count: number;
 }
 
+export interface GiteaSyncSkip {
+  name: string;
+  kind: 'org' | 'project';
+  reason: string;
+}
+
+export interface GiteaSyncResult {
+  orgs_created: string[];
+  projects_created: string[];
+  repos_created: string[];
+  projects_deleted: string[];
+  skipped: GiteaSyncSkip[];
+}
+
 export interface DeploymentOut {
   id: number;
   project_id: number;

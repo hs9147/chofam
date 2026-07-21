@@ -15,13 +15,17 @@ from sqlalchemy import select
 from .. import git_policy
 from ..config import get_settings
 from ..db import SessionLocal
-from ..models import BuildProfile, Deployment, Project, ProjectType
+from ..models import BuildProfile, Deployment, Organization, Project, ProjectType
 from . import deployer
 
 logger = logging.getLogger(__name__)
 
 SELF_CONSOLE_PROJECT_NAME = "paas-console"
 SELF_CONSOLE_SUBDIR = "platform/console"
+# 콘솔 자기 배포는 admin 조직 소속으로 등록한다 — /apps/admin/paas-console/ 경로가 된다.
+# Gitea 조직 자동 생성(services/gitea.py)은 거치지 않는다 — git_url이 이미 주어져
+# 있어(이 리포 자신) 새 리포를 만들 필요가 없기 때문.
+SELF_DEPLOY_ORG_NAME = "admin"
 
 
 def bootstrap_console_deploy() -> None:
@@ -45,9 +49,19 @@ def bootstrap_console_deploy() -> None:
             select(Project).where(Project.name == SELF_CONSOLE_PROJECT_NAME)
         ).scalar_one_or_none()
         if project is None:
+            org = db.execute(
+                select(Organization).where(Organization.name == SELF_DEPLOY_ORG_NAME)
+            ).scalar_one_or_none()
+            if org is None:
+                org = Organization(name=SELF_DEPLOY_ORG_NAME)
+                db.add(org)
+                db.commit()
+                db.refresh(org)
+
             project = Project(
                 name=SELF_CONSOLE_PROJECT_NAME,
                 type=ProjectType.react,
+                organization_id=org.id,
                 git_url=settings.self_deploy_console_git_url,
                 branch=settings.self_deploy_console_branch,
                 source_subdir=SELF_CONSOLE_SUBDIR,

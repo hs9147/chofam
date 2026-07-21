@@ -124,7 +124,7 @@ def test_composite_deploy_both_succeed_configures_proxy_once(monkeypatch, tmp_pa
         assert len(proxy_calls) == 1
         routes: list[PathRoute] = proxy_calls[0][0][3]
         # organization_id 없는 프로젝트라 조직 자리는 "_" — path_prefix_for("_"/{name}/[api/])
-        assert [r.path_prefix for r in routes] == ["/_/shop/api/", "/_/shop/"]
+        assert [r.path_prefix for r in routes] == ["/apps/_/shop/api/", "/apps/_/shop/"]
         assert len(runtime.calls) == 2  # backend, frontend 각각 한 번씩 start()
     finally:
         db.close()
@@ -179,7 +179,7 @@ def test_composite_deploy_frontend_fails_backend_restored_from_previous(monkeypa
         assert len(proxy_calls) == 1
         routes: list[PathRoute] = proxy_calls[0][0][3]
         ports = {r.path_prefix: r.endpoint.port for r in routes}
-        assert ports["/_/shop2/api/"] != ports["/_/shop2/"]  # 서로 다른 컨테이너
+        assert ports["/apps/_/shop2/api/"] != ports["/apps/_/shop2/"]  # 서로 다른 컨테이너
 
         # 새 backend 배포 행은 running, 이번 시도의 frontend 행은 failed로 기록.
         rows = db.execute(

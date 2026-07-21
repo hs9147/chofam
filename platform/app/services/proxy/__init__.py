@@ -33,7 +33,7 @@ def get_proxy() -> ReverseProxy:
 
 def domain_for(project_name: str, custom_domain: str | None, profile: BuildProfile) -> str:
     """1차(small)의 배포 URL은 서브패스 기반이다 — 모든 프로젝트가 base_domain
-    하나를 공유하고 /{조직}/{프로젝트}/ 경로로 구분된다(path_prefix_for). 예외는
+    하나를 공유하고 /apps/{조직}/{프로젝트}/ 경로로 구분된다(path_prefix_for). 예외는
     release 배포에 커스텀 도메인(project.domain)을 지정한 경우 — 그 도메인을
     그대로 쓴다(development는 항상 공유 base_domain).
 
@@ -55,7 +55,9 @@ def path_prefix_for(
     org_name: str | None, project_name: str, custom_domain: str | None, profile: BuildProfile,
 ) -> str:
     """domain_for와 짝 — 2차(enterprise)와 release+커스텀 도메인 예외는 "/"(도메인
-    전체가 이 프로젝트 것), 그 외에는 /{조직 또는 "_"}/{프로젝트}/[dev/] 서브패스."""
+    전체가 이 프로젝트 것), 그 외에는 /apps/{조직 또는 "_"}/{프로젝트}/[dev/] 서브패스.
+    "apps" 세그먼트는 배포된 프로젝트 트래픽을 base_domain의 다른 용도(향후 추가될
+    최상위 경로 등)와 네임스페이스로 분리하기 위한 고정 접두사다."""
     settings = get_settings()
     if settings.tier == "enterprise":
         return "/"
@@ -63,7 +65,7 @@ def path_prefix_for(
         return "/"
     org_segment = org_name or "_"
     dev_segment = "dev/" if profile == BuildProfile.development else ""
-    return f"/{org_segment}/{project_name}/{dev_segment}"
+    return f"/apps/{org_segment}/{project_name}/{dev_segment}"
 
 
 def configure(

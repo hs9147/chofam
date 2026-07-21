@@ -160,6 +160,19 @@ def detect_composite_components(workdir: Path) -> dict[str, ProjectType] | None:
     return {name: _detect_component_type(d) for name, d in dirs.items()}
 
 
+def detect_project_type(workdir: Path) -> ProjectType | None:
+    """리포 루트만 보고 프로젝트 타입을 추론한다(services/gitea_sync.py 전용 — Gitea에서
+    기존 리포를 가져올 때 사용자가 type을 지정하지 않으므로). backend/, frontend/가
+    둘 다 있으면 composite, 그 외엔 _detect_component_type과 동일한 시그니처 규칙.
+    추론 불가하면 None(추측성 기본값 금지 — 호출부가 건너뛰고 보고해야 한다)."""
+    if detect_composite_components(workdir) is not None:
+        return ProjectType.composite
+    try:
+        return _detect_component_type(workdir)
+    except ValueError:
+        return None
+
+
 def _detect_component_type(component_dir: Path) -> ProjectType:
     if (component_dir / "requirements.txt").exists() or (component_dir / "pyproject.toml").exists():
         return ProjectType.python

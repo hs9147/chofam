@@ -113,7 +113,7 @@ sudo apt install -y caddy
 ```
 
 DNS: 배포는 기본적으로 서브패스 기반이다 — 모든 프로젝트가 `PAAS_BASE_DOMAIN` 하나를
-공유하고 `/{조직}/{프로젝트}/`(조직 없는 프로젝트는 `/_/{프로젝트}/`, development는
+공유하고 `/apps/{조직}/{프로젝트}/`(조직 없는 프로젝트는 `/apps/_/{프로젝트}/`, development는
 그 아래 `/dev/`) 경로로 구분되므로, A 레코드 `deploy.example.com → 서버 IP` 한 줄이면
 충분하다. 와일드카드(`*.deploy.example.com`)는 커스텀 도메인을 지정한 release 배포나
 PR 프리뷰(`{project}-pv{id}.deploy.example.com`)처럼 여전히 서브도메인을 쓰는 예외
@@ -208,16 +208,16 @@ docker compose logs -f platform   # 기동 확인
 이라는 이름의 보통 `react` 타입 Project로 등록하고, 3.3절과 동일한 배포 파이프라인
 (build_image → DockerRuntime 컨테이너 → 리버스프록시)으로 첫 배포를 트리거한다.
 콘솔은 이제 정적 마운트가 아니라 별도 컨테이너로 서빙된다 — 배포는 기본적으로
-서브패스 기반이므로(3.1절 참고), 조직 없이 등록되는 이 프로젝트는
-`https://{base_domain}/_/paas-console/`에서 접속한다.
+서브패스 기반이므로(3.1절 참고), `admin` 조직 소속으로 등록되는 이 프로젝트는
+`https://{base_domain}/apps/admin/paas-console/`에서 접속한다.
 
 콘솔은 이 리포(`chofam`) 안 `platform/console/` 서브폴더에 있어 리포 루트만으로는
 빌드 컨텍스트를 찾을 수 없다 — 그래서 `Project.source_subdir`(모노레포 서브폴더
 빌드 컨텍스트 필드, 어떤 프로젝트에나 범용으로 쓸 수 있다)를 `platform/console`로
 설정해 등록한다. `platform/console/Dockerfile`은 이 자기 배포 전용으로 이미
 리포에 포함돼 있다(일반 `react.release.Dockerfile` 템플릿과 달리 `vite build
---base=/_/paas-console/`로 빌드한다 — 콘솔이 `/console`도 도메인 루트도 아니라
-`/_/paas-console/` 경로에서 서빙되기 때문).
+--base=/apps/admin/paas-console/`로 빌드한다 — 콘솔이 `/console`도 도메인 루트도 아니라
+`/apps/admin/paas-console/` 경로에서 서빙되기 때문).
 
 ```bash
 # .env에 추가
@@ -254,12 +254,12 @@ curl -X POST $API/projects -H "x-api-key: $ADMIN" -H 'content-type: application/
   -d '{"name":"portal-api","type":"python","git_url":"https://github.com/org/portal-api",
        "branch":"main","health_check_path":"/healthz"}'
 
-# 2) development 배포 → https://deploy.example.com/_/portal-api/dev/
-#    (organization_id로 등록했다면 /_/ 대신 /{조직}/ — 1절 표·3.1절 DNS 설명 참고)
+# 2) development 배포 → https://deploy.example.com/apps/_/portal-api/dev/
+#    (organization_id로 등록했다면 /apps/_/ 대신 /apps/{조직}/ — 1절 표·3.1절 DNS 설명 참고)
 curl -X POST $API/projects/1/deploy -H "x-api-key: $ADMIN" \
   -H 'content-type: application/json' -d '{"profile":"development"}'
 
-# 3) 확인 후 release 배포 → https://deploy.example.com/_/portal-api/
+# 3) 확인 후 release 배포 → https://deploy.example.com/apps/_/portal-api/
 curl -X POST $API/projects/1/deploy -H "x-api-key: $ADMIN" \
   -H 'content-type: application/json' -d '{"profile":"release"}'
 
@@ -348,6 +348,15 @@ npm run build
 - `PAAS_HOST_OS`는 `windows`로 자동 감지된다. GPU는 Docker Desktop의 WSL2 백엔드를 경유해 지원.
 - Caddy: `winget install CaddyServer.Caddy` (또는 scoop/choco) 후 Caddyfile에
   `import C:\paas\platform\data\caddy-sites\*.caddy` 추가. `caddy run --config <Caddyfile>`.
+- **IIS를 리버스프록시로 쓰려면**(`PAAS_PROXY_BACKEND=iis`) 먼저 서버 역할에서
+  Web Server(IIS) + **URL Rewrite 모듈**(마이크로소프트 공식 확장, IIS 기본 설치에는
+  없음 — [별도 설치](https://www.iis.net/downloads/microsoft/url-rewrite) 필요)을 추가한다.
+  플랫폼이 이 모듈이 읽는 `web.config`를 실제로 생성해 두는 위치가
+  `PAAS_IIS_SITES_ROOT`(기본 `./data/iis-sites` — 상대경로면 `platform/` 기준. 절대경로
+  권장, 예: `C:\paas\platform\data\iis-sites`)이고, 사이트를 등록/해제할 때 부르는
+  `appcmd.exe` 경로가 `PAAS_IIS_APPCMD_PATH`(기본
+  `C:\Windows\System32\inetsrv\appcmd.exe` — 표준 설치 경로면 그대로 둘 것)다. IIS
+  프로세스(앱풀 계정)가 `PAAS_IIS_SITES_ROOT` 폴더에 읽기 권한을 가져야 한다.
 - 서비스 등록(부팅 시 자동 시작): [NSSM](https://nssm.cc)으로 uvicorn·caddy를 Windows 서비스로 등록.
 - 한글 등 파일 인코딩은 플랫폼 코드가 UTF-8을 명시해 처리한다 — Windows CI에서 전 테스트 통과 확인됨.
 - 팀 규모가 크면 Docker Desktop 라이선스(기업 유료)를 확인할 것 — 부담되면 A(WSL2 + Docker Engine) 방식이 무료.
@@ -539,10 +548,10 @@ curl -X POST $API/projects/1/deploy -H "x-api-key: $ADMIN" \
   -H 'content-type: application/json' -d '{"profile":"release"}'
 ```
 
-배포되면 `https://deploy.example.com/{조직}/portal-app/api/*`는 backend로, 같은 경로
+배포되면 `https://deploy.example.com/apps/{조직}/portal-app/api/*`는 backend로, 같은 경로
 아래 나머지 전체는 frontend로 자동 라우팅된다(Caddy `handle_path` / IIS URL Rewrite
 조건부 규칙 / Apache `ProxyPass` 접두사 — 3.1절에서 고른 프록시 백엔드와 무관하게
-동일하게 동작). 매칭된 접두사(`/{조직}/portal-app/api`)는 백엔드로 전달되기 전에
+동일하게 동작). 매칭된 접두사(`/apps/{조직}/portal-app/api`)는 백엔드로 전달되기 전에
 제거된다 — 백엔드는 `/api/users`가 아니라 `/users`로 라우트를 짜면 된다.
 
 **원자적 배포**: backend/frontend 둘 중 하나만 빌드·기동에 실패하면, 실패한 컴포넌트만
@@ -561,12 +570,12 @@ curl -X POST $API/projects/1/deploy -H "x-api-key: $ADMIN" \
 
 ```
 portal-front (React)  → Netlify            (git push → 자동 배포 + PR 프리뷰)
-portal-api  (FastAPI) → 자체 PaaS release  → https://deploy.example.com/_/portal-api/
+portal-api  (FastAPI) → 자체 PaaS release  → https://deploy.example.com/apps/_/portal-api/
 llm-main  (vLLM)    → 자체 PaaS GPU      → project://llm-main (내부 전용)
 메일/결제            → CHO-FAM Functions  (portal-api에는 MAIL_* 모듈 주입)
 ```
 
-- portal-front의 API 주소는 Netlify 환경변수로 `https://deploy.example.com/_/portal-api/` 지정
+- portal-front의 API 주소는 Netlify 환경변수로 `https://deploy.example.com/apps/_/portal-api/` 지정
 - 자체 서버는 GPU·상시 프로세스만 담당 → 서버 1대로 시작 가능
 
 ---

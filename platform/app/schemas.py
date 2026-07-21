@@ -16,6 +16,20 @@ class OrgOut(BaseModel):
     project_count: int
 
 
+class GiteaSyncSkip(BaseModel):
+    name: str
+    kind: str  # "org" | "project"
+    reason: str
+
+
+class GiteaSyncResult(BaseModel):
+    orgs_created: list[str]
+    projects_created: list[str]
+    repos_created: list[str]
+    projects_deleted: list[str]
+    skipped: list[GiteaSyncSkip]
+
+
 class ProjectCreate(BaseModel):
     name: str = Field(pattern=r"^[a-z0-9][a-z0-9-]{1,40}$")
     type: ProjectType

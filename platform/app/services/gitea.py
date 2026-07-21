@@ -60,6 +60,35 @@ def ensure_repo(org_name: str, repo_name: str, auto_init: bool = True) -> str:
     raise GiteaError(f"Gitea 리포 생성 실패 (HTTP {res.status_code}): {res.text[:300]}")
 
 
+def list_orgs() -> list[dict]:
+    """토큰이 접근 가능한 Gitea 조직 전체 목록(gitea_sync.sync_from_gitea 전용)."""
+    base, headers = _base_and_headers()
+    return _paginated(f"{base}/api/v1/orgs", headers)
+
+
+def list_org_repos(org_name: str) -> list[dict]:
+    """조직 아래 리포 전체 목록."""
+    base, headers = _base_and_headers()
+    return _paginated(f"{base}/api/v1/orgs/{org_name}/repos", headers)
+
+
+def _paginated(url: str, headers: dict[str, str]) -> list[dict]:
+    items: list[dict] = []
+    page = 1
+    while True:
+        res = httpx.get(url, headers=headers, params={"page": page, "limit": 50}, timeout=15)
+        if res.status_code != 200:
+            raise GiteaError(f"Gitea 목록 조회 실패 (HTTP {res.status_code}): {res.text[:300]}")
+        batch = res.json()
+        if not batch:
+            break
+        items.extend(batch)
+        if len(batch) < 50:
+            break
+        page += 1
+    return items
+
+
 def ensure_webhook(org_name: str, repo_name: str) -> None:
     """리포에 플랫폼 push 웹훅이 없으면 등록한다(멱등) — 수동 설정 없이 자동 배포가 되도록.
 

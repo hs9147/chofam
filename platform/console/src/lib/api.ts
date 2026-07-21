@@ -5,6 +5,7 @@ import type {
   AuditRow,
   BuildProfile,
   CodeMapOut,
+  GiteaSyncResult,
   HealthInfo,
   PaymentOut,
   ChatReply,
@@ -190,6 +191,8 @@ export const api = {
   // 조직 (사내 Gitea 작업공간)
   listOrgs: () => request<OrgOut[]>('GET', '/orgs'),
   createOrg: (name: string) => request<OrgOut>('POST', '/orgs', { name }),
+  syncOrgsFromGitea: (onMissingRepo: 'create' | 'delete' = 'create') =>
+    request<GiteaSyncResult>('POST', '/orgs/sync', undefined, { on_missing_repo: onMissingRepo }),
   deploy: (id: number, profile?: BuildProfile, git_sha?: string) =>
     request<DeploymentOut>('POST', `/projects/${id}/deploy`, {
       profile: profile ?? null,
