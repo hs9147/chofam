@@ -46,7 +46,7 @@ export default function Providers() {
                 <tr>
                   <th>이름</th>
                   <th>구분</th>
-                  <th>Base URL</th>
+                  <th>Endpoint</th>
                   <th>모델</th>
                   <th>API 키</th>
                 </tr>
@@ -87,7 +87,7 @@ export default function Providers() {
               </label>
             </div>
             <label className="field">
-              Base URL
+              Endpoint
               <input
                 className="mono"
                 value={form.base_url}

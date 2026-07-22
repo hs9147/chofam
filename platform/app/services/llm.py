@@ -66,7 +66,7 @@ def chat_completion(
     tool-call 프로토콜로 모델↔도구를 오간다 — 모델이 더 이상 tool_calls를 요청하지
     않을 때까지(최대 MAX_TOOL_ROUNDS회) 반복하고 최종 텍스트만 반환한다. tools가
     없으면 기존과 동일하게 단발 completion."""
-    url = resolve_base_url(provider.base_url, db) + "/v1/chat/completions"
+    url = resolve_base_url(provider.base_url, db)
     headers = {"content-type": "application/json"}
     if provider.api_key_encrypted:
         headers["authorization"] = f"Bearer {decrypt_value(provider.api_key_encrypted)}"
