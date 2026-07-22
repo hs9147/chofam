@@ -7,6 +7,10 @@
 입금)도 서빙합니다. 인증은 동일한 `x-api-key`이며, 지급 API 사용 가능 소스는
 `PAYOUT_SOURCES` 시크릿/환경변수(기본 `liv-ay`)로 별도 제한됩니다.
 
+`/api/billing/*`(토스페이먼츠 결제 승인 프록시 — mentor 구독 청구)도 같은 함수가
+서빙합니다. 인증은 동일한 `x-api-key`이며, 청구 API 사용 가능 소스는 `BILLING_SOURCES`
+시크릿/환경변수(기본 `mentor`)로 별도 제한됩니다.
+
 ## 엔드포인트
 
 베이스 URL: `https://cho-fam.web.app/api/mail` (Hosting rewrite를 통해 Functions로 연결)
@@ -20,6 +24,18 @@
 | GET | `/templates/:key` | `x-api-key` (admin) | 템플릿 단건 조회 |
 | POST | `/templates` | `x-api-key` (admin) | 템플릿 생성/수정. Body: `{ key, description, templates }` |
 | DELETE | `/templates/:key` | `x-api-key` (admin) | 템플릿 삭제 |
+
+### 청구(결제 승인) — `/api/billing`
+
+| Method | Path | 인증 | 설명 |
+| --- | --- | --- | --- |
+| POST | `/confirm` | `x-api-key` (`BILLING_SOURCES`) | 결제 승인. Body: `{ paymentKey, orderId, amount }` |
+
+프론트엔드 결제위젯이 만든 `paymentKey`/`orderId`/`amount`를 호출 서비스 **백엔드**가
+받아 이 API로 넘기면 토스가 청구를 확정합니다(성공 `{ ok, paymentKey, orderId, status,
+totalAmount, currency, approvedAt }`). `amount`는 결제 요청 금액과 정확히 일치해야
+하며(불일치 시 `502`), 승인 결과는 `billing_logs`에 기록됩니다. 토스 키(`TOSS_SECRET_KEY`)
+미설정 시 `503 billing_not_configured`.
 
 ## 설정
 
