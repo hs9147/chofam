@@ -37,6 +37,18 @@ def allocate_port() -> int:
     raise RuntimeError("no free port in configured range")
 
 
+def _sc_binary() -> str:
+    import os  # noqa: PLC0415
+    import shutil  # noqa: PLC0415
+
+    if shutil.which("sc"):
+        return "sc"
+    default_sc = r"C:\Windows\System32\sc.exe"
+    if os.path.exists(default_sc):
+        return default_sc
+    return "sc"
+
+
 class WindowsServiceRuntime(Runtime):
     def start(self, spec: RuntimeSpec) -> Endpoint:
         settings = get_settings()
@@ -104,19 +116,25 @@ class WindowsServiceRuntime(Runtime):
         return None
 
     def _exists(self, name: str) -> bool:
-        proc = subprocess.run(["sc", "query", name], capture_output=True, text=True)
-        return proc.returncode == 0
+        try:
+            proc = subprocess.run([_sc_binary(), "query", name], capture_output=True, text=True)
+            return proc.returncode == 0
+        except FileNotFoundError:
+            return False
 
     def _query_state(self, name: str) -> str:
-        proc = subprocess.run(["sc", "query", name], capture_output=True, text=True)
-        if proc.returncode != 0:
+        try:
+            proc = subprocess.run([_sc_binary(), "query", name], capture_output=True, text=True)
+            if proc.returncode != 0:
+                return "stopped"
+            out = proc.stdout.upper()
+            if "RUNNING" in out:
+                return "running"
+            if "STOPPED" in out:
+                return "stopped"
+            return "unknown"
+        except FileNotFoundError:
             return "stopped"
-        out = proc.stdout.upper()
-        if "RUNNING" in out:
-            return "running"
-        if "STOPPED" in out:
-            return "stopped"
-        return "unknown"
 
     def _teardown(self, name: str) -> None:
         nssm = get_settings().nssm_path
