@@ -190,11 +190,17 @@ def _ensure_arr_proxy_enabled() -> None:
     전달된다 — 이 서버 레벨 설정이 꺼진 채로(또는 ARR 미설치로) 사이트를 만들면 규칙은
     매칭되는데 응답이 안 오는(502/무응답) 상태로 조용히 배포가 "성공"해 버리므로, 베이스
     사이트 최초 생성 시점에 명시적으로 켜고 실패하면 바로 에러로 드러낸다."""
+def _ensure_arr_proxy_enabled() -> None:
     appcmd = get_settings().iis_appcmd_path
-    proc = subprocess.run(
-        [appcmd, "set", "config", "-section:system.webServer/proxy", "/enabled:True", "/commit:apphost"],
-        capture_output=True, text=True,
-    )
+    try:
+        proc = subprocess.run(
+            [appcmd, "set", "config", "-section:system.webServer/proxy", "/enabled:True", "/commit:apphost"],
+            capture_output=True, text=True,
+        )
+    except FileNotFoundError as e:
+        raise IISError(
+            f"appcmd 실행 파일을 찾을 수 없습니다 (PAAS_IIS_APPCMD_PATH={appcmd}): {e}"
+        ) from e
     if proc.returncode != 0:
         raise IISError(
             "ARR(Application Request Routing) 프록시 기능을 켜지 못했습니다 — ARR이 설치돼 "
@@ -209,10 +215,15 @@ def _ensure_base_site() -> None:
     site_dir.mkdir(parents=True, exist_ok=True)
     if not (site_dir / "web.config").exists():
         _regenerate_base_web_config()
-    proc = subprocess.run(
-        [settings.iis_appcmd_path, "list", "site", f"/name:{BASE_SITE_NAME}"],
-        capture_output=True, text=True,
-    )
+    try:
+        proc = subprocess.run(
+            [settings.iis_appcmd_path, "list", "site", f"/name:{BASE_SITE_NAME}"],
+            capture_output=True, text=True,
+        )
+    except FileNotFoundError as e:
+        raise IISError(
+            f"appcmd 실행 파일을 찾을 수 없습니다 (PAAS_IIS_APPCMD_PATH={settings.iis_appcmd_path}): {e}"
+        ) from e
     if proc.returncode == 0 and proc.stdout.strip():
         return
     _ensure_arr_proxy_enabled()
@@ -225,7 +236,12 @@ def _ensure_base_site() -> None:
 
 def _run_appcmd(*args: str) -> None:
     appcmd = get_settings().iis_appcmd_path
-    proc = subprocess.run([appcmd, *args], capture_output=True, text=True)
+    try:
+        proc = subprocess.run([appcmd, *args], capture_output=True, text=True)
+    except FileNotFoundError as e:
+        raise IISError(
+            f"appcmd 실행 파일을 찾을 수 없습니다 (PAAS_IIS_APPCMD_PATH={appcmd}): {e}"
+        ) from e
     if proc.returncode != 0:
         raise IISError(
             f"appcmd {args[0]} 실패 (IIS 미설치 시 PAAS_IIS_APPCMD_PATH 확인): "

@@ -138,8 +138,11 @@ class WindowsServiceRuntime(Runtime):
 
     def _teardown(self, name: str) -> None:
         nssm = get_settings().nssm_path
-        subprocess.run([nssm, "stop", name], capture_output=True, text=True)
-        subprocess.run([nssm, "remove", name, "confirm"], capture_output=True, text=True)
+        try:
+            subprocess.run([nssm, "stop", name], capture_output=True, text=True)
+            subprocess.run([nssm, "remove", name, "confirm"], capture_output=True, text=True)
+        except FileNotFoundError:
+            pass
 
     def _nssm(self, *args: str) -> None:
         nssm = get_settings().nssm_path
