@@ -280,10 +280,13 @@ class IISProxy(ReverseProxy):
         config_path.write_text(_splice_managed_rules(existing, rule_blocks), encoding="utf-8")
 
         _ensure_arr_proxy_enabled()
-        subprocess.run(
-            [settings.iis_appcmd_path, "delete", "site", f"/site.name:{name}"],
-            capture_output=True, text=True,
-        )
+        try:
+            subprocess.run(
+                [settings.iis_appcmd_path, "delete", "site", f"/site.name:{name}"],
+                capture_output=True, text=True,
+            )
+        except FileNotFoundError:
+            pass
         _run_appcmd(
             "add", "site",
             f"/name:{name}", f"/physicalPath:{site_dir}", f"/bindings:http/*:80:{domain}",
@@ -299,7 +302,10 @@ class IISProxy(ReverseProxy):
 
         # 전용 모드(커스텀 도메인) 사이트 — 없으면 조용히 넘어간다.
         name = site_name(project_name, profile)
-        subprocess.run(
-            [settings.iis_appcmd_path, "delete", "site", f"/site.name:{name}"],
-            capture_output=True, text=True,
-        )
+        try:
+            subprocess.run(
+                [settings.iis_appcmd_path, "delete", "site", f"/site.name:{name}"],
+                capture_output=True, text=True,
+            )
+        except FileNotFoundError:
+            pass

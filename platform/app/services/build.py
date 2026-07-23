@@ -132,9 +132,10 @@ def build_image(
         str(context_dir),
     ]
     with open(log_path, "w", encoding="utf-8") as log:
-        log.write(f"$ {' '.join(cmd)}\n")
-        log.flush()
-        proc = subprocess.run(cmd, stdout=log, stderr=subprocess.STDOUT)
+        try:
+            proc = subprocess.run(cmd, stdout=log, stderr=subprocess.STDOUT)
+        except FileNotFoundError as e:
+            raise BuildError(f"[WinError 2] docker CLI 실행 파일을 찾을 수 없습니다: {e}", log_path) from e
     if proc.returncode != 0:
         raise BuildError(f"docker build failed (exit {proc.returncode})", log_path)
 
@@ -212,14 +213,20 @@ def checkout(project: Project, git_sha: str | None = None) -> tuple[Path, str]:
         _run_git(["reset", "--hard", f"origin/{project.branch}"], cwd=workdir)
     if git_sha:
         _run_git(["checkout", git_sha], cwd=workdir)
-    out = subprocess.run(
-        ["git", "rev-parse", "HEAD"], cwd=workdir, capture_output=True, text=True, check=True
-    )
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=workdir, capture_output=True, text=True, check=True
+        )
+    except FileNotFoundError as e:
+        raise BuildError(f"[WinError 2] git 실행 파일을 찾을 수 없습니다: {e}") from e
     return workdir, out.stdout.strip()
 
 
 def _run_git(args: list[str], cwd: Path | None = None, git_url: str | None = None) -> None:
     auth = auth_args(git_url) if git_url else []
-    proc = subprocess.run(["git", *auth, *args], cwd=cwd, capture_output=True, text=True)
+    try:
+        proc = subprocess.run(["git", *auth, *args], cwd=cwd, capture_output=True, text=True)
+    except FileNotFoundError as e:
+        raise BuildError(f"[WinError 2] git 실행 파일을 찾을 수 없습니다: {e}") from e
     if proc.returncode != 0:
         raise BuildError(f"git {args[0]} failed: {proc.stderr.strip()[:500]}")
