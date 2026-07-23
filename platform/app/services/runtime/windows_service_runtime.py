@@ -169,15 +169,16 @@ class WindowsServiceRuntime(Runtime):
 
     def _nssm(self, *args: str) -> None:
         nssm = _nssm_binary()
+        settings = get_settings()
         try:
             proc = subprocess.run([nssm, *args], capture_output=True, text=True)
         except FileNotFoundError as e:
             raise WindowsServiceError(
-                f"nssm 실행 파일을 찾을 수 없습니다 (PAAS_NSSM_PATH={get_settings().nssm_path}): {e}"
+                f"[WinError 2] nssm 실행 파일을 찾을 수 없습니다 (설정: PAAS_NSSM_PATH={settings.nssm_path}, 시도 경로: {nssm}): {e}"
             ) from e
         if proc.returncode != 0:
             raise WindowsServiceError(
-                f"nssm {args[0]} 실패 (nssm 미설치 시 PAAS_NSSM_PATH 확인): "
+                f"nssm {args[0]} 실패 (nssm 미설치 시 PAAS_NSSM_PATH={settings.nssm_path} 확인): "
                 f"{(proc.stderr or proc.stdout).strip()[:500]}"
             )
 

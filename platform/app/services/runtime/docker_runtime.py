@@ -18,7 +18,15 @@ def _docker_client():
         import docker  # noqa: PLC0415 — 선택 의존성
     except ImportError as e:
         raise RuntimeError("docker SDK가 설치되지 않았습니다 (pip install docker)") from e
-    return docker.from_env()
+    try:
+        return docker.from_env()
+    except Exception as e:
+        err_msg = str(e)
+        if "CreateFile" in err_msg or "WinError 2" in err_msg or "cannot find the file" in err_msg.lower():
+            raise RuntimeError(
+                f"[WinError 2] Docker 데몬 연결 실패 (Docker Desktop/Engine 미실행, 소켓: \\\\.\\pipe\\docker_engine): {e}"
+            ) from e
+        raise
 
 
 def allocate_port() -> int:

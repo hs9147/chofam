@@ -199,7 +199,7 @@ def _ensure_arr_proxy_enabled() -> None:
         )
     except FileNotFoundError as e:
         raise IISError(
-            f"appcmd 실행 파일을 찾을 수 없습니다 (PAAS_IIS_APPCMD_PATH={appcmd}): {e}"
+            f"[WinError 2] appcmd 실행 파일을 찾을 수 없습니다 (설정: PAAS_IIS_APPCMD_PATH={appcmd}): {e}"
         ) from e
     if proc.returncode != 0:
         raise IISError(
@@ -222,7 +222,7 @@ def _ensure_base_site() -> None:
         )
     except FileNotFoundError as e:
         raise IISError(
-            f"appcmd 실행 파일을 찾을 수 없습니다 (PAAS_IIS_APPCMD_PATH={settings.iis_appcmd_path}): {e}"
+            f"[WinError 2] appcmd 실행 파일을 찾을 수 없습니다 (설정: PAAS_IIS_APPCMD_PATH={settings.iis_appcmd_path}): {e}"
         ) from e
     if proc.returncode == 0 and proc.stdout.strip():
         return
@@ -240,7 +240,7 @@ def _run_appcmd(*args: str) -> None:
         proc = subprocess.run([appcmd, *args], capture_output=True, text=True)
     except FileNotFoundError as e:
         raise IISError(
-            f"appcmd 실행 파일을 찾을 수 없습니다 (PAAS_IIS_APPCMD_PATH={appcmd}): {e}"
+            f"[WinError 2] appcmd 실행 파일을 찾을 수 없습니다 (설정: PAAS_IIS_APPCMD_PATH={appcmd}): {e}"
         ) from e
     if proc.returncode != 0:
         raise IISError(
