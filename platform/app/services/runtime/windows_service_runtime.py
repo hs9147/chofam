@@ -49,6 +49,29 @@ def _sc_binary() -> str:
     return "sc"
 
 
+def _nssm_binary() -> str:
+    import os  # noqa: PLC0415
+    import shutil  # noqa: PLC0415
+
+    configured = get_settings().nssm_path
+    if os.path.exists(configured):
+        return configured
+    found = shutil.which(configured)
+    if found:
+        return found
+    candidates = [
+        r"C:\tools\nssm-2.24\win64\nssm.exe",
+        r"C:\tools\nssm-2.24\win32\nssm.exe",
+        r"C:\tools\nssm\nssm.exe",
+        r"C:\Program Files\nssm\win64\nssm.exe",
+        r"C:\Program Files\nssm\nssm.exe",
+    ]
+    for c in candidates:
+        if os.path.exists(c):
+            return c
+    return configured
+
+
 class WindowsServiceRuntime(Runtime):
     def start(self, spec: RuntimeSpec) -> Endpoint:
         settings = get_settings()
@@ -137,7 +160,7 @@ class WindowsServiceRuntime(Runtime):
             return "stopped"
 
     def _teardown(self, name: str) -> None:
-        nssm = get_settings().nssm_path
+        nssm = _nssm_binary()
         try:
             subprocess.run([nssm, "stop", name], capture_output=True, text=True)
             subprocess.run([nssm, "remove", name, "confirm"], capture_output=True, text=True)
@@ -145,12 +168,12 @@ class WindowsServiceRuntime(Runtime):
             pass
 
     def _nssm(self, *args: str) -> None:
-        nssm = get_settings().nssm_path
+        nssm = _nssm_binary()
         try:
             proc = subprocess.run([nssm, *args], capture_output=True, text=True)
         except FileNotFoundError as e:
             raise WindowsServiceError(
-                f"nssm 실행 파일을 찾을 수 없습니다 (PAAS_NSSM_PATH={nssm}): {e}"
+                f"nssm 실행 파일을 찾을 수 없습니다 (PAAS_NSSM_PATH={get_settings().nssm_path}): {e}"
             ) from e
         if proc.returncode != 0:
             raise WindowsServiceError(
