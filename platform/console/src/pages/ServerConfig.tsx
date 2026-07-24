@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import Async from '../components/Async';
+import DeployProgressModal from '../components/DeployProgressModal';
 import Modal from '../components/Modal';
 import StatusPill from '../components/StatusPill';
 import TopologyDiagram from '../components/TopologyDiagram';
@@ -10,22 +11,34 @@ import type { BuildProfile, RedirectRule } from '../lib/types';
 export default function ServerConfig() {
   const state = useApi(() => api.serverConfig());
   const [rulesFor, setRulesFor] = useState<{ id: number; name: string } | null>(null);
+  const [deployFor, setDeployFor] =
+    useState<{ projectId: number; ids: number[]; name: string; profile: BuildProfile } | null>(null);
   const [busyKey, setBusyKey] = useState('');
   const [error, setError] = useState('');
   const [showTopology, setShowTopology] = useState(true);
 
-  const runAction = async (
-    projectId: number, profile: BuildProfile, kind: 'deploy' | 'stop',
-  ) => {
-    const key = `${projectId}-${profile}-${kind}`;
-    setBusyKey(key);
+  // 배포는 큐(비블로킹)로 한 번만 요청하고, 받은 레코드 id를 진행 로그 모달에 넘겨
+  // 폴링으로 진행 상황을 보여준다.
+  const startDeploy = async (projectId: number, name: string, profile: BuildProfile) => {
+    setBusyKey(`${projectId}-${profile}-deploy`);
     setError('');
     try {
-      if (kind === 'deploy') {
-        await api.deploy(projectId, profile);
-      } else {
-        await api.stop(projectId, profile);
-      }
+      const result = await api.deployQueued(projectId, profile);
+      const records = Array.isArray(result) ? result : [result];
+      setDeployFor({ projectId, ids: records.map((r) => r.id), name, profile });
+    } catch (e) {
+      const err = e as ApiError;
+      setError(err.status === 409 ? '이미 배포가 진행 중입니다. 잠시 후 다시 시도하세요.' : err.message);
+    } finally {
+      setBusyKey('');
+    }
+  };
+
+  const stopProject = async (projectId: number, profile: BuildProfile) => {
+    setBusyKey(`${projectId}-${profile}-stop`);
+    setError('');
+    try {
+      await api.stop(projectId, profile);
       state.reload();
     } catch (e) {
       setError((e as ApiError).message);
@@ -94,14 +107,14 @@ export default function ServerConfig() {
                         <button
                           className="small"
                           disabled={busyKey === deployKey}
-                          onClick={() => runAction(s.project_id, s.profile, 'deploy')}
+                          onClick={() => startDeploy(s.project_id, s.project_name, s.profile)}
                         >
                           배포
                         </button>
                         <button
                           className="small danger"
                           disabled={busyKey === stopKey}
-                          onClick={() => runAction(s.project_id, s.profile, 'stop')}
+                          onClick={() => stopProject(s.project_id, s.profile)}
                         >
                           중지
                         </button>
@@ -126,6 +139,18 @@ export default function ServerConfig() {
           projectName={rulesFor.name}
           onClose={() => setRulesFor(null)}
           onChanged={() => state.reload()}
+        />
+      )}
+      {deployFor && (
+        <DeployProgressModal
+          projectId={deployFor.projectId}
+          projectName={deployFor.name}
+          profile={deployFor.profile}
+          deploymentIds={deployFor.ids}
+          onClose={() => {
+            setDeployFor(null);
+            state.reload();
+          }}
         />
       )}
     </div>

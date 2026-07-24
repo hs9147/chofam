@@ -259,6 +259,9 @@ class ServerConfigSite(BaseModel):
     redirects: list[RedirectRuleSummary]
     # composite 프로젝트만 채워짐(backend/frontend 개별 상태) — 일반 프로젝트는 None.
     components: list[ComponentStatus] | None = None
+    # 프록시 설정(IIS web.config 등)에 실제로 라우팅이 구성돼 있는지 — 프록시가
+    # 설정 멤버십을 추적하지 않는 백엔드(caddy/apache)에서는 None.
+    in_proxy: bool | None = None
 
 
 class ServerConfigOut(BaseModel):

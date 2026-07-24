@@ -198,6 +198,14 @@ export const api = {
       profile: profile ?? null,
       git_sha: git_sha || null,
     }),
+  // 비블로킹 배포 — 즉시 building 레코드(들)를 받아 진행 상황을 폴링으로 추적한다.
+  // composite 프로젝트는 backend/frontend 두 레코드를 배열로 돌려준다.
+  deployQueued: (id: number, profile?: BuildProfile, git_sha?: string) =>
+    request<DeploymentOut | DeploymentOut[]>('POST', `/projects/${id}/deploy`, {
+      profile: profile ?? null,
+      git_sha: git_sha || null,
+      wait: false,
+    }),
   rollback: (id: number, profile: BuildProfile) =>
     request<DeploymentOut>('POST', `/projects/${id}/rollback`, undefined, { profile }),
   stop: (id: number, profile: BuildProfile) =>

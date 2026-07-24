@@ -50,10 +50,15 @@ export default function TopologyDiagram({ cfg }: { cfg: ServerConfigOut }) {
           const x = i * (NODE_W + GAP_X);
           const midX = x + NODE_W / 2;
           const bottomY = SITE_Y + siteHeight(s);
+          // in_proxy === false: 프록시 설정(web.config)에 라우팅이 없음 = 미연결.
+          // null(추적 안 하는 백엔드)이면 기존처럼 실선으로 둔다.
+          const disconnected = s.in_proxy === false;
           return (
             <g key={`edge-${s.project_id}-${s.profile}`}>
               <path
                 className="topo-edge"
+                strokeDasharray={disconnected ? '4 4' : undefined}
+                opacity={disconnected ? 0.35 : undefined}
                 d={`M ${centerX + NODE_W / 2} ${PROXY_Y + NODE_H} C ${centerX + NODE_W / 2} ${PROXY_Y + NODE_H + 30}, ${midX} ${SITE_Y - 30}, ${midX} ${SITE_Y}`}
               />
               <path
@@ -91,6 +96,10 @@ export default function TopologyDiagram({ cfg }: { cfg: ServerConfigOut }) {
         <span className="row" style={{ gap: 4 }}>
           <span className="topo-dot" style={{ background: 'var(--accent)' }} />
           <span className="mutedtext" style={{ fontSize: 11 }}>숫자 배지 = redirect/rewrite 규칙 수(마우스 올리면 상세)</span>
+        </span>
+        <span className="row" style={{ gap: 4 }}>
+          <svg width={22} height={8}><line x1={0} y1={4} x2={22} y2={4} stroke="var(--muted)" strokeWidth={2} strokeDasharray="4 4" /></svg>
+          <span className="mutedtext" style={{ fontSize: 11 }}>점선 = 프록시(web.config)에 미구성 — 미연결</span>
         </span>
       </div>
     </div>

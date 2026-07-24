@@ -202,6 +202,9 @@ export interface ServerConfigSite {
   redirects: RedirectRuleSummary[];
   // composite 프로젝트만 채워짐 — 일반 프로젝트는 null
   components: ComponentStatus[] | null;
+  // 프록시 설정(IIS web.config 등)에 실제로 라우팅이 구성됐는지 — 추적하지 않는
+  // 백엔드(caddy/apache)에서는 null
+  in_proxy: boolean | null;
 }
 
 export interface ServerConfigOut {
