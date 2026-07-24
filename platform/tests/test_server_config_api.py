@@ -132,6 +132,40 @@ def test_server_config_composite_partial_status_summarized_as_partial(monkeypatc
     assert statuses == {"backend": "running", "frontend": "failed"}
 
 
+def test_server_config_in_proxy_reflects_iis_web_config(monkeypatch, fresh_settings, tmp_path):
+    """windows_service(IIS) 구성에서 in_proxy는 web.config(routes/)에 실제 라우팅
+    조각이 있는 사이트만 True — 배포 전(조각 없음) 프로필은 False."""
+    monkeypatch.setattr(deployer, "get_runtime", lambda: _FakeRuntime())
+    monkeypatch.setenv("PAAS_RUNTIME_BACKEND", "windows_service")
+    monkeypatch.setenv("PAAS_PROXY_BACKEND", "iis")
+    monkeypatch.setenv("PAAS_IIS_SITES_ROOT", str(tmp_path))
+    get_settings.cache_clear()
+
+    c = _client()
+    pid = _create_project(c, "shop-web")
+    # release 프로필의 라우팅 조각만 web.config(routes/)에 존재하도록 만든다.
+    routes = tmp_path / "_base" / "routes"
+    routes.mkdir(parents=True)
+    (routes / "shop-web.xml").write_text("<!-- rule -->", encoding="utf-8")
+
+    body = c.get("/paas/api/v1/server-config", headers=ADMIN).json()
+    release = next(s for s in body["sites"] if s["project_id"] == pid and s["profile"] == "release")
+    dev = next(s for s in body["sites"] if s["project_id"] == pid and s["profile"] == "development")
+    assert release["in_proxy"] is True   # routes/shop-web.xml 존재
+    assert dev["in_proxy"] is False       # shop-web-dev.xml 없음
+
+
+def test_server_config_in_proxy_none_for_caddy(monkeypatch, fresh_settings):
+    """caddy 백엔드는 설정 멤버십을 추적하지 않으므로 in_proxy=None(프런트는 기존처럼
+    상태로만 연결을 판단)."""
+    monkeypatch.setattr(deployer, "get_runtime", lambda: _FakeRuntime())
+    c = _client()
+    pid = _create_project(c)
+    body = c.get("/paas/api/v1/server-config", headers=ADMIN).json()
+    site = next(s for s in body["sites"] if s["project_id"] == pid)
+    assert site["in_proxy"] is None
+
+
 def test_redirect_crud_flow(fresh_settings):
     c = _client()
     pid = _create_project(c)

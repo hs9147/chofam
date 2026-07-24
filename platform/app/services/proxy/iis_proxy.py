@@ -309,3 +309,23 @@ class IISProxy(ReverseProxy):
             )
         except FileNotFoundError:
             pass
+
+    def configured_sites(self) -> set[str]:
+        """web.config에 실제로 라우팅이 구성된 사이트 이름(site_name) 집합.
+
+        공유 모드는 routes/ 아래 조각 파일(파일 stem = site_name), 커스텀 도메인
+        전용 사이트는 web.config를 가진 iis_sites_root 하위 디렉터리(디렉터리 이름
+        = site_name)로 판별한다 — 서버구성 다이어그램이 "실제로 프록시에 연결된"
+        사이트를 표시하는 근거가 된다."""
+        root = get_settings().iis_sites_root
+        names: set[str] = set()
+        routes_dir = root / BASE_SITE_NAME / "routes"
+        if routes_dir.is_dir():
+            names.update(f.stem for f in routes_dir.glob("*.xml"))
+        if root.is_dir():
+            for d in root.iterdir():
+                if d.name == BASE_SITE_NAME or not d.is_dir():
+                    continue
+                if (d / "web.config").exists():
+                    names.add(d.name)
+        return names

@@ -25,7 +25,8 @@ from ..schemas import (
 from ..security import require_api_key
 from ..services import deployer
 from ..services.build import COMPOSITE_COMPONENTS
-from ..services.proxy import domain_for, path_prefix_for
+from ..services.proxy import domain_for, get_proxy, path_prefix_for
+from ..services.proxy.base import site_name
 
 router = APIRouter(tags=["server"])
 
@@ -34,6 +35,10 @@ router = APIRouter(tags=["server"])
 def server_config(db: Session = Depends(get_db), _: ApiKey = Depends(require_api_key)):
     settings = get_settings()
     runtime = deployer.get_runtime()
+    # windows_service(IIS 프록시) 등에서는 "연결된 프로젝트"의 근거가 web.config에
+    # 실제 구성된 라우팅이다 — 프록시가 알려주면 사이트별 in_proxy로 실어 보낸다.
+    # 추적하지 않는 백엔드(caddy/apache)는 None → 프런트는 기존처럼 상태로만 판단.
+    configured_sites = get_proxy().configured_sites() if settings.tier == "small" else None
     projects = db.execute(select(Project).order_by(Project.id)).scalars().all()
     rules_by_project: dict[int, list[RedirectRule]] = defaultdict(list)
     for rule in db.execute(select(RedirectRule).order_by(RedirectRule.id)).scalars():
@@ -78,6 +83,10 @@ def server_config(db: Session = Depends(get_db), _: ApiKey = Depends(require_api
                     status = f"unknown ({e})"
             org_name = p.organization.name if p.organization else None
             project_rules = rules_by_project.get(p.id, [])
+            in_proxy = (
+                None if configured_sites is None
+                else site_name(p.name, profile) in configured_sites
+            )
             sites.append(ServerConfigSite(
                 project_id=p.id,
                 project_name=p.name,
@@ -94,6 +103,7 @@ def server_config(db: Session = Depends(get_db), _: ApiKey = Depends(require_api
                     for r in project_rules
                 ],
                 components=components,
+                in_proxy=in_proxy,
             ))
     return ServerConfigOut(
         runtime_backend=settings.runtime_backend if settings.tier == "small" else "kubernetes",
