@@ -49,7 +49,8 @@ export default function DeployProgressModal({
           if (lastStatusRef.current[r.id] !== r.status) {
             lastStatusRef.current[r.id] = r.status;
             const label = r.component ? `${r.component} ` : '';
-            append(`· ${label}#${r.id}: ${r.status}${r.error ? ` — ${r.error.slice(0, 300)}` : ''}`);
+            append(`· ${label}#${r.id}: ${r.status}`);
+            if (r.error) append(r.error.slice(0, 4000)); // 실패 사유(로그 tail 포함) 전체 표시
           }
         }
         const allTerminal =
