@@ -264,10 +264,20 @@ class ServerConfigSite(BaseModel):
     in_proxy: bool | None = None
 
 
+class UnregisteredSite(BaseModel):
+    """프록시 설정(IIS web.config)에는 있으나 DB에 프로젝트로 등록되지 않은 라우트 —
+    이름(site_name)과 rewrite 타겟 주소만 표시한다."""
+
+    name: str
+    rewrite_targets: list[str]
+
+
 class ServerConfigOut(BaseModel):
     runtime_backend: str
     proxy_backend: str
     sites: list[ServerConfigSite]
+    # 프록시 설정에만 존재하고 DB 프로젝트와 매칭되지 않는 항목(추적 백엔드에서만 채워짐)
+    unregistered: list[UnregisteredSite] = []
 
 
 class ApiKeyCreate(BaseModel):

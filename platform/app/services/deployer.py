@@ -24,6 +24,7 @@ from .build import (
     checkout,
     detect_composite_components,
     internal_port,
+    write_start_script,
 )
 from .runtime.base import Endpoint, Runtime, RuntimeSpec
 
@@ -146,9 +147,11 @@ def deploy_sync(
         db.commit()
         try:
             if get_settings().runtime_backend == "windows_service":
-                # windows_service 런타임은 이미지 대신 리포 루트의 paas-start.cmd를 nssm으로
+                # windows_service 런타임은 이미지 대신 리포 루트의 start.cmd를 nssm으로
                 # Windows Service에 등록해 네이티브 실행한다 — docker build를 건너뛴다
-                # (image_tag는 이 런타임이 사용하지 않는다).
+                # (image_tag는 이 런타임이 사용하지 않는다). start.cmd를 조건 없이
+                # 자동 생성한다(dockerfile_for와 대칭 — 매 배포 시 갱신).
+                write_start_script(workdir)
                 image_tag = ""
             else:
                 result = build_image(project, workdir, sha, profile)
@@ -360,12 +363,12 @@ def deploy_composite_sync(
         raise DeployInProgress(project.name)
     try:
         if get_settings().runtime_backend == "windows_service":
-            # windows_service는 리포 루트의 단일 paas-start.cmd만 실행하므로 backend/frontend
+            # windows_service는 리포 루트의 단일 start.cmd만 실행하므로 backend/frontend
             # 두 컴포넌트를 네이티브로 나눠 띄울 수 없다 — docker build로 조용히 실패하지 않고
             # 여기서 명확히 실패시킨다.
             msg = (
                 f"{project.name}: windows_service 런타임은 composite(backend/frontend) "
-                "프로젝트를 지원하지 않습니다 — 리포 루트의 단일 paas-start.cmd만 실행합니다. "
+                "프로젝트를 지원하지 않습니다 — 리포 루트의 단일 start.cmd만 실행합니다. "
                 "docker 런타임을 쓰거나 각 컴포넌트를 별도 프로젝트로 분리하세요."
             )
             if records:

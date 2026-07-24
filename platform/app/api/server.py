@@ -20,7 +20,7 @@ from ..models import (
 )
 from ..schemas import (
     ComponentStatus, RedirectRuleCreate, RedirectRuleOut, RedirectRuleSummary,
-    ServerConfigOut, ServerConfigSite,
+    ServerConfigOut, ServerConfigSite, UnregisteredSite,
 )
 from ..security import require_api_key
 from ..services import deployer
@@ -36,9 +36,11 @@ def server_config(db: Session = Depends(get_db), _: ApiKey = Depends(require_api
     settings = get_settings()
     runtime = deployer.get_runtime()
     # windows_service(IIS 프록시) 등에서는 "연결된 프로젝트"의 근거가 web.config에
-    # 실제 구성된 라우팅이다 — 프록시가 알려주면 사이트별 in_proxy로 실어 보낸다.
-    # 추적하지 않는 백엔드(caddy/apache)는 None → 프런트는 기존처럼 상태로만 판단.
-    configured_sites = get_proxy().configured_sites() if settings.tier == "small" else None
+    # 실제 구성된 라우팅이다 — 프록시가 알려주면 사이트별 in_proxy로 실어 보내고,
+    # DB에 없는 항목은 unregistered(이름·rewrite 주소)로 별도 표시한다. 추적하지 않는
+    # 백엔드(caddy/apache)는 None → 프런트는 기존처럼 상태로만 판단.
+    configured_routes = get_proxy().configured_routes() if settings.tier == "small" else None
+    configured_names = None if configured_routes is None else {name for name, _ in configured_routes}
     projects = db.execute(select(Project).order_by(Project.id)).scalars().all()
     rules_by_project: dict[int, list[RedirectRule]] = defaultdict(list)
     for rule in db.execute(select(RedirectRule).order_by(RedirectRule.id)).scalars():
@@ -84,8 +86,8 @@ def server_config(db: Session = Depends(get_db), _: ApiKey = Depends(require_api
             org_name = p.organization.name if p.organization else None
             project_rules = rules_by_project.get(p.id, [])
             in_proxy = (
-                None if configured_sites is None
-                else site_name(p.name, profile) in configured_sites
+                None if configured_names is None
+                else site_name(p.name, profile) in configured_names
             )
             sites.append(ServerConfigSite(
                 project_id=p.id,
@@ -105,10 +107,22 @@ def server_config(db: Session = Depends(get_db), _: ApiKey = Depends(require_api
                 components=components,
                 in_proxy=in_proxy,
             ))
+    unregistered: list[UnregisteredSite] = []
+    if configured_routes is not None:
+        registered = {
+            site_name(p.name, profile) for p in projects for profile in BuildProfile
+        }
+        unregistered = [
+            UnregisteredSite(name=name, rewrite_targets=targets)
+            for name, targets in configured_routes
+            if name not in registered
+        ]
+
     return ServerConfigOut(
         runtime_backend=settings.runtime_backend if settings.tier == "small" else "kubernetes",
         proxy_backend=settings.proxy_backend if settings.tier == "small" else "k8s-ingress",
         sites=sites,
+        unregistered=unregistered,
     )
 
 

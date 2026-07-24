@@ -207,10 +207,17 @@ export interface ServerConfigSite {
   in_proxy: boolean | null;
 }
 
+export interface UnregisteredSite {
+  name: string;
+  rewrite_targets: string[];
+}
+
 export interface ServerConfigOut {
   runtime_backend: string;
   proxy_backend: string;
   sites: ServerConfigSite[];
+  // 프록시 설정(web.config)에만 있고 DB 프로젝트로 등록되지 않은 항목 (추적 백엔드만)
+  unregistered: UnregisteredSite[];
 }
 
 export interface RedirectRule {

@@ -55,7 +55,7 @@ def env(monkeypatch, tmp_path, fresh_settings):
     settings = get_settings()
     workdir = settings.work_dir / "shop"
     workdir.mkdir(parents=True, exist_ok=True)
-    (workdir / "paas-start.cmd").write_text("echo start\n", encoding="utf-8")
+    (workdir / "start.cmd").write_text("echo start\n", encoding="utf-8")
 
     fake = _FakeServices()
     monkeypatch.setattr(subprocess, "run", fake.run)
@@ -66,7 +66,7 @@ def env(monkeypatch, tmp_path, fresh_settings):
 def test_start_requires_start_script(tmp_path, monkeypatch, fresh_settings):
     monkeypatch.setenv("PAAS_WORK_DIR", str(tmp_path / "work"))
     get_settings.cache_clear()
-    with pytest.raises(WindowsServiceError, match="paas-start.cmd"):
+    with pytest.raises(WindowsServiceError, match="start.cmd"):
         WindowsServiceRuntime().start(_spec())
 
 
@@ -122,7 +122,7 @@ def test_missing_nssm_binary_raises_clear_error(tmp_path, monkeypatch, fresh_set
     get_settings.cache_clear()
     workdir = get_settings().work_dir / "shop"
     workdir.mkdir(parents=True, exist_ok=True)
-    (workdir / "paas-start.cmd").write_text("echo start\n", encoding="utf-8")
+    (workdir / "start.cmd").write_text("echo start\n", encoding="utf-8")
 
     def boom(args, **kw):
         if args[0] == get_settings().nssm_path:

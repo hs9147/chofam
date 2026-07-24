@@ -79,7 +79,7 @@ class Settings(BaseSettings):
 
     # --- windows_service 런타임 전용 ---
     # nssm(Non-Sucking Service Manager, public domain) 실행 파일 경로. 리포 루트의
-    # paas-start.cmd(관례 — PORT 환경변수로 리슨 포트 전달)를 서비스로 등록해 기동한다.
+    # start.cmd(배포 시 자동 생성 — PORT 환경변수로 리슨 포트 전달)를 서비스로 등록해 기동한다.
     nssm_path: str = "nssm"
 
     # --- iis 프록시 전용 ---

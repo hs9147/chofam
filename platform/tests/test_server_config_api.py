@@ -155,6 +155,48 @@ def test_server_config_in_proxy_reflects_iis_web_config(monkeypatch, fresh_setti
     assert dev["in_proxy"] is False       # shop-web-dev.xml 없음
 
 
+def test_server_config_lists_unregistered_web_config_routes(monkeypatch, fresh_settings, tmp_path):
+    """web.config에는 있으나 DB 프로젝트로 등록되지 않은 항목을 이름·rewrite 주소로
+    별도 표시한다(등록된 프로젝트는 unregistered에 나오지 않는다)."""
+    monkeypatch.setattr(deployer, "get_runtime", lambda: _FakeRuntime())
+    monkeypatch.setenv("PAAS_RUNTIME_BACKEND", "windows_service")
+    monkeypatch.setenv("PAAS_PROXY_BACKEND", "iis")
+    monkeypatch.setenv("PAAS_IIS_SITES_ROOT", str(tmp_path))
+    get_settings.cache_clear()
+
+    c = _client()
+    _create_project(c, "shop-web")  # 등록된 프로젝트
+    routes = tmp_path / "_base" / "routes"
+    routes.mkdir(parents=True)
+    # 등록 프로젝트의 조각(unregistered에 나오면 안 됨)
+    (routes / "shop-web.xml").write_text(
+        '<rule name="shop-web-path-0"><match url="^apps/_/shop-web/(.*)" />'
+        '<action type="Rewrite" url="http://127.0.0.1:8101/{R:1}" /></rule>',
+        encoding="utf-8",
+    )
+    # 미등록 항목 — 프로젝트로 등록되지 않은 legacy 라우트
+    (routes / "legacy-portal.xml").write_text(
+        '<rule name="legacy-portal-path-0"><match url="^legacy/(.*)" />'
+        '<action type="Rewrite" url="http://127.0.0.1:9000/{R:1}" /></rule>',
+        encoding="utf-8",
+    )
+
+    body = c.get("/paas/api/v1/server-config", headers=ADMIN).json()
+    names = {u["name"] for u in body["unregistered"]}
+    assert names == {"legacy-portal"}  # 등록된 shop-web은 제외
+    legacy = next(u for u in body["unregistered"] if u["name"] == "legacy-portal")
+    assert legacy["rewrite_targets"] == ["http://127.0.0.1:9000/{R:1}"]
+
+
+def test_server_config_unregistered_empty_for_caddy(monkeypatch, fresh_settings):
+    """caddy 백엔드는 설정을 추적하지 않으므로 unregistered는 빈 목록이다."""
+    monkeypatch.setattr(deployer, "get_runtime", lambda: _FakeRuntime())
+    c = _client()
+    _create_project(c)
+    body = c.get("/paas/api/v1/server-config", headers=ADMIN).json()
+    assert body["unregistered"] == []
+
+
 def test_server_config_in_proxy_none_for_caddy(monkeypatch, fresh_settings):
     """caddy 백엔드는 설정 멤버십을 추적하지 않으므로 in_proxy=None(프런트는 기존처럼
     상태로만 연결을 판단)."""

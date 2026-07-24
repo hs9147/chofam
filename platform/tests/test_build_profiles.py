@@ -5,7 +5,15 @@ import pytest
 
 from app.models import BuildProfile, Project, ProjectType
 from app.services import build as build_service
-from app.services.build import PROFILES, TEMPLATE_DIR, build_image, dockerfile_for, internal_port
+from app.services.build import (
+    PROFILES,
+    START_SCRIPT_NAME,
+    TEMPLATE_DIR,
+    build_image,
+    dockerfile_for,
+    internal_port,
+    write_start_script,
+)
 
 
 def test_image_tag_suffix():
@@ -57,6 +65,21 @@ def test_dev_templates_run_dev_servers():
     assert "npm" in react_dev and "dev" in react_dev
     assert "--reload" in python_dev
     assert "--workers" in python_rel and "--reload" not in python_rel
+
+
+def test_write_start_script_generates_generic_cmd(tmp_path):
+    """windows_service: start.cmd를 조건 없이 자동 생성한다(리포 시그니처로 실행 추정)."""
+    path = write_start_script(tmp_path)
+    assert path == tmp_path / START_SCRIPT_NAME
+    assert path.name == "start.cmd"
+    content = path.read_text(encoding="utf-8")
+    assert "uvicorn" in content and "npm" in content and "%PORT%" in content
+
+
+def test_write_start_script_overwrites_unconditionally(tmp_path):
+    (tmp_path / START_SCRIPT_NAME).write_text("@echo custom\n", encoding="utf-8")
+    write_start_script(tmp_path)
+    assert (tmp_path / START_SCRIPT_NAME).read_text(encoding="utf-8") != "@echo custom\n"
 
 
 def test_html_serves_static_files_port_80():

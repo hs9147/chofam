@@ -18,6 +18,7 @@ web.config는 플랫폼이 전부 새로 쓰는 게 아니라, 기존 파일에 
 갈아끼우고, 마커 밖은 절대 건드리지 않는다(_splice_managed_rules). 같은 기존
 파일·같은 배포 상태를 다시 넣으면 항상 같은 바이트를 낸다(결정적, 멱등).
 """
+import re
 import subprocess
 
 from ...config import get_settings
@@ -71,6 +72,19 @@ def _splice_managed_rules(existing_text: str, rule_blocks: str) -> str:
 
 def _read_existing_or_skeleton(path) -> str:
     return path.read_text(encoding="utf-8") if path.exists() else _SKELETON
+
+
+_REWRITE_TARGET_RE = re.compile(r'<action\s+type="Rewrite"\s+url="([^"]+)"', re.IGNORECASE)
+
+
+def _rewrite_targets(xml: str) -> list[str]:
+    """web.config 조각에서 Rewrite 액션의 타겟 URL을 순서·중복 유지 없이 뽑는다
+    (플랫폼이 쓴 형식 기준 — 중복 제거하고 첫 등장 순서 유지)."""
+    seen: list[str] = []
+    for url in _REWRITE_TARGET_RE.findall(xml):
+        if url not in seen:
+            seen.append(url)
+    return seen
 
 
 class IISError(RuntimeError):
@@ -310,22 +324,25 @@ class IISProxy(ReverseProxy):
         except FileNotFoundError:
             pass
 
-    def configured_sites(self) -> set[str]:
-        """web.config에 실제로 라우팅이 구성된 사이트 이름(site_name) 집합.
+    def configured_routes(self) -> list[tuple[str, list[str]]]:
+        """web.config에 구성된 (site_name, rewrite 타겟 URL 목록) 목록.
 
         공유 모드는 routes/ 아래 조각 파일(파일 stem = site_name), 커스텀 도메인
         전용 사이트는 web.config를 가진 iis_sites_root 하위 디렉터리(디렉터리 이름
-        = site_name)로 판별한다 — 서버구성 다이어그램이 "실제로 프록시에 연결된"
-        사이트를 표시하는 근거가 된다."""
+        = site_name)로 판별한다. rewrite 타겟은 플랫폼이 쓴 <action type="Rewrite"
+        url="..."/>에서 뽑는다 — 서버구성이 연결 여부와 미등록 항목(이름·rewrite 주소)을
+        표시하는 근거가 된다."""
         root = get_settings().iis_sites_root
-        names: set[str] = set()
+        result: list[tuple[str, list[str]]] = []
         routes_dir = root / BASE_SITE_NAME / "routes"
         if routes_dir.is_dir():
-            names.update(f.stem for f in routes_dir.glob("*.xml"))
+            for f in sorted(routes_dir.glob("*.xml")):
+                result.append((f.stem, _rewrite_targets(f.read_text(encoding="utf-8"))))
         if root.is_dir():
-            for d in root.iterdir():
+            for d in sorted(root.iterdir()):
                 if d.name == BASE_SITE_NAME or not d.is_dir():
                     continue
-                if (d / "web.config").exists():
-                    names.add(d.name)
-        return names
+                cfg = d / "web.config"
+                if cfg.exists():
+                    result.append((d.name, _rewrite_targets(cfg.read_text(encoding="utf-8"))))
+        return result

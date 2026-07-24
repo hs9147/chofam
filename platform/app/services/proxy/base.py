@@ -65,10 +65,11 @@ class ReverseProxy(ABC):
     def remove(self, project_name: str, profile: BuildProfile) -> None:
         """사이트 설정을 제거한다."""
 
-    def configured_sites(self) -> set[str] | None:
-        """프록시 설정 파일에 실제로 라우팅이 구성된 사이트 이름(site_name) 집합.
+    def configured_routes(self) -> list[tuple[str, list[str]]] | None:
+        """프록시 설정 파일에 구성된 (사이트 이름 site_name, rewrite 타겟 URL 목록) 목록.
 
-        설정 파일을 소스로 '연결 여부'를 판별할 수 있는 백엔드(IIS의 web.config)만
+        설정 파일을 소스로 실제 라우팅을 읽을 수 있는 백엔드(IIS의 web.config)만
         구현한다. 그 외 백엔드는 None을 반환해 "추적하지 않음"을 알린다 —
-        호출측(서버구성 다이어그램)은 None이면 기존처럼 런타임 상태로만 판단한다."""
+        호출측(서버구성)은 None이면 프록시 설정 기반 표시(연결 여부·미등록 항목)를
+        생략하고 기존처럼 런타임 상태로만 판단한다."""
         return None

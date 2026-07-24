@@ -133,6 +133,33 @@ export default function ServerConfig() {
           </table>
         )}
       </Async>
+      {state.data && state.data.unregistered.length > 0 && (
+        <div style={{ marginTop: 18 }}>
+          <h3 style={{ marginBottom: 6 }}>미등록 라우트</h3>
+          <p className="mutedtext" style={{ fontSize: 12, marginTop: 0 }}>
+            프록시 설정(web.config)에는 있으나 프로젝트로 등록되지 않은 항목입니다 —
+            이름과 rewrite 대상 주소만 표시합니다.
+          </p>
+          <table>
+            <thead>
+              <tr>
+                <th>이름</th>
+                <th>rewrite 주소</th>
+              </tr>
+            </thead>
+            <tbody>
+              {state.data.unregistered.map((u) => (
+                <tr key={u.name}>
+                  <td className="mono">{u.name}</td>
+                  <td className="mono">
+                    {u.rewrite_targets.length > 0 ? u.rewrite_targets.join(', ') : '-'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
       {rulesFor && (
         <RedirectRulesModal
           projectId={rulesFor.id}

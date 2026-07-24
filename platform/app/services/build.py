@@ -21,6 +21,28 @@ from ..models import BuildProfile, Project, ProjectType
 from .git_auth import auth_args
 
 TEMPLATE_DIR = Path(__file__).resolve().parent.parent.parent / "templates" / "dockerfiles"
+START_SCRIPT_NAME = "start.cmd"
+
+# windows_service 런타임용 제네릭 시작 스크립트. 타입별 규칙 없이 리포 시그니처
+# (package.json / requirements.txt / app.py)로 실행 방법을 런타임에 추정한다.
+# PORT/HOST는 windows_service 런타임이 주입한다(HOST=127.0.0.1로 로컬 바인드).
+_START_SCRIPT = """@echo off
+REM 플랫폼 자동 생성(windows_service) — PORT/HOST는 런타임이 주입한다.
+if not defined PORT set PORT=8000
+if not defined HOST set HOST=127.0.0.1
+if exist package.json (
+  call npm ci
+  call npm run build --if-present
+  npm start
+) else if exist requirements.txt (
+  py -m pip install --disable-pip-version-check -r requirements.txt
+  py -m uvicorn app.main:app --host %HOST% --port %PORT%
+) else if exist app.py (
+  py -m uvicorn app.main:app --host %HOST% --port %PORT%
+) else (
+  py -m http.server %PORT% --bind %HOST%
+)
+"""
 
 # 프로젝트 타입별 컨테이너 내부 포트. (react release는 정적 파일을 caddy로 서빙)
 INTERNAL_PORTS: dict[tuple[ProjectType, BuildProfile], int] = {
@@ -90,6 +112,17 @@ def dockerfile_for(project_type: ProjectType, profile: BuildProfile, workdir: Pa
     if not template.exists():
         raise FileNotFoundError(f"no dockerfile template: {template.name}")
     return template
+
+
+def write_start_script(workdir: Path) -> Path:
+    """windows_service 런타임용 start.cmd를 조건 없이 자동 생성한다(매 배포 시 덮어씀).
+
+    타입별 규칙 없이 리포 시그니처로 실행 방법을 추정하는 제네릭 스크립트라 프로젝트
+    타입/프로필을 가리지 않는다 — docker의 dockerfile_for가 이미지 빌드를 담당하는
+    자리를 windows_service에서 이 함수가 대신한다."""
+    path = workdir / START_SCRIPT_NAME
+    path.write_text(_START_SCRIPT, encoding="utf-8")
+    return path
 
 
 def internal_port(project_type: ProjectType, profile: BuildProfile) -> int:

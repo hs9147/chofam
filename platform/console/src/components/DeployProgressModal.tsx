@@ -22,6 +22,12 @@ export default function DeployProgressModal({
   const [done, setDone] = useState(false);
   const [failed, setFailed] = useState(false);
   const logRef = useRef<HTMLPreElement | null>(null);
+  // 폴링을 딱 한 번만 시작하기 위한 ref들 — StrictMode의 이중 마운트(마운트→cleanup→
+  // 재마운트)에서도 루프가 하나만 돌아 로그가 중복 출력되지 않게 한다.
+  const startedRef = useRef(false);
+  const cancelledRef = useRef(false);
+  const timerRef = useRef<number | null>(null);
+  const lastStatusRef = useRef<Record<number, string>>({});
 
   const append = (line: string) => setLines((prev) => [...prev, line]);
 
@@ -31,18 +37,17 @@ export default function DeployProgressModal({
   }, [lines]);
 
   useEffect(() => {
-    let cancelled = false;
-    let timer: number | null = null;
-    const lastStatus: Record<number, string> = {};
+    cancelledRef.current = false; // (재)마운트 시 활성화 — 진행 중이던 루프를 되살린다
 
     const poll = async () => {
-      if (cancelled) return;
+      if (cancelledRef.current) return;
       try {
         const rows = await api.deployments(projectId);
+        if (cancelledRef.current) return;
         const mine = rows.filter((r) => deploymentIds.includes(r.id));
         for (const r of mine) {
-          if (lastStatus[r.id] !== r.status) {
-            lastStatus[r.id] = r.status;
+          if (lastStatusRef.current[r.id] !== r.status) {
+            lastStatusRef.current[r.id] = r.status;
             const label = r.component ? `${r.component} ` : '';
             append(`· ${label}#${r.id}: ${r.status}${r.error ? ` — ${r.error.slice(0, 300)}` : ''}`);
           }
@@ -62,7 +67,7 @@ export default function DeployProgressModal({
           } catch {
             /* 완료 후 로그 tail 조회 실패는 진행 결과에 영향 없음 — 무시 */
           }
-          if (!cancelled) {
+          if (!cancelledRef.current) {
             setFailed(anyFail);
             setDone(true);
           }
@@ -71,15 +76,18 @@ export default function DeployProgressModal({
       } catch (e) {
         append(`폴링 오류: ${(e as ApiError).message}`);
       }
-      timer = window.setTimeout(poll, 1500);
+      timerRef.current = window.setTimeout(poll, 1500);
     };
 
-    append(`배포 진행 상황을 확인합니다… (${projectName} · ${profile})`);
-    poll();
+    if (!startedRef.current) {
+      startedRef.current = true;
+      append(`배포 진행 상황을 확인합니다… (${projectName} · ${profile})`);
+      poll();
+    }
 
     return () => {
-      cancelled = true;
-      if (timer) window.clearTimeout(timer);
+      cancelledRef.current = true;
+      if (timerRef.current) window.clearTimeout(timerRef.current);
     };
   }, [projectId, profile, projectName, deploymentIds]);
 

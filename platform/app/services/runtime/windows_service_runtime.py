@@ -1,9 +1,9 @@
 """1차(small) 대안 런타임 — Windows Service (Docker 없이 네이티브 프로세스로 실행).
 
 IIS/Apache 뒤에 배치하는 Windows 환경 등 Docker Engine을 쓸 수 없는 구성을 위한
-런타임이다. 컨테이너 이미지 대신 체크아웃된 리포 루트의 paas-start.cmd(필수 관례 —
-PORT 환경변수로 리슨 포트를 전달받아 그 포트에서 서비스를 띄운다)를
-nssm(Non-Sucking Service Manager, public domain)으로 Windows Service에 등록해 실행한다.
+런타임이다. 컨테이너 이미지 대신 체크아웃된 리포 루트의 start.cmd(배포 시 build.py의
+write_start_script가 자동 생성 — PORT 환경변수로 리슨 포트를 전달받아 그 포트에서
+서비스를 띄운다)를 nssm(Non-Sucking Service Manager, public domain)으로 Windows Service에 등록해 실행한다.
 
 Docker와 달리 네이티브 프로세스라 플랫폼이 바인드 주소를 강제할 방법이 없다 — PORT와
 함께 HOST=127.0.0.1도 넘겨주므로, 앱이 이를 지켜 바인드하면 프록시(단일 외부 포트)만
@@ -76,11 +76,11 @@ class WindowsServiceRuntime(Runtime):
     def start(self, spec: RuntimeSpec) -> Endpoint:
         settings = get_settings()
         workdir = settings.work_dir / spec.project_name
-        start_script = workdir / "paas-start.cmd"
+        start_script = workdir / "start.cmd"
         if not start_script.exists():
             raise WindowsServiceError(
-                "windows_service 런타임은 리포 루트에 paas-start.cmd가 필요합니다 "
-                f"(PORT 환경변수로 리슨 포트 전달): {start_script}"
+                "windows_service 런타임은 리포 루트에 start.cmd가 필요합니다 "
+                f"(배포 시 자동 생성됨 — PORT/HOST 환경변수로 리슨 포트·바인드 주소 전달): {start_script}"
             )
 
         host_port = allocate_port()
